@@ -5,6 +5,7 @@ from toad.main_screen import MainScreen
 
 
 class ToadApp(App):
+    BINDING_GROUP_TITLE = "System"
     CSS_PATH = "toad.tcss"
 
     def on_mount(self) -> None:

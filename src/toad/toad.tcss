@@ -6,13 +6,15 @@ Throbber {
     &.-busy {
         visibility: visible;
     }   
-}
+} 
 
 Conversation {
     height: 1fr;
     max-width: 100;    
     background: black 10%;
+    layers: base prompt;
     Prompt {
+        
         dock: bottom;
         width: 1fr; 
         TextArea {
@@ -34,10 +36,13 @@ Conversation {
     Cursor {
         width: 2;
         height: 1;                
-        border-left: outer $accent;        
-        overlay: screen;  
+        border-left: outer $text-accent;        
+        # overlay: screen;  
+        layer: prompt;
+        # position: absolute;
         &.-blink {
-            visibility: hidden;            
+            border-left: outer $text-accent 20%; 
+            # visibility: hidden;            
         }          
     }
 }

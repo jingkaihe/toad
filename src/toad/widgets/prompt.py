@@ -13,6 +13,7 @@ from toad.messages import UserInputSubmitted
 
 
 class MarkdownTextArea(TextArea):
+    BINDING_GROUP_TITLE = "Prompt"
     BINDINGS = [Binding("ctrl+j", "submit", "Submit markdown")]
 
     class Submitted(Message):
@@ -35,6 +36,9 @@ class MarkdownTextArea(TextArea):
 
 
 class Prompt(containers.VerticalGroup):
+    def focus(self) -> None:
+        self.query(MarkdownTextArea).focus()
+
     def compose(self) -> ComposeResult:
         yield MarkdownTextArea()
         with containers.HorizontalGroup():

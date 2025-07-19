@@ -190,11 +190,11 @@ I would like to add controls to these widgets to export the table as CSV, which 
 class Cursor(Static):
     follow_widget: var[Widget | None] = var(None)
     blink = var(True, toggle_class="-blink")
-    blink_timer: var[Timer | None] = None
 
     def on_mount(self) -> None:
-        self.blink_timer = self.set_interval(0.5, self._update_blink)
-        # self.update("⮕")
+        self.display = False
+        self.blink_timer = self.set_interval(0.5, self._update_blink, pause=True)
+        self.set_interval(0.2, self._update_follow)
 
     def _update_blink(self) -> None:
         self.blink = not self.blink
@@ -205,46 +205,47 @@ class Cursor(Static):
     def _update_follow(self) -> None:
         if self.follow_widget:
             self.styles.height = max(1, self.follow_widget.size.height)
-            self.offset = Offset(
-                0,
-                self.follow_widget.region.y + self.parent.scroll_offset.y,
-            )
-            if self.blink_timer is not None:
-                self.blink_timer.reset()
-            self.blink = False
-            # self.styles.animate("height", self.follow_widget.size.height, speed=0.1)
-            # self.animate(
-            #     "offset",
-            #     Offset(
-            #         0,
-            #         self.follow_widget.region.y + self.parent.scroll_offset.y,
-            #     ),
-            #     duration=0.1,
-            # )
+            follow_y = self.follow_widget.region.y
+            self.offset = Offset(0, follow_y + self.container_scroll_offset.y)
 
     def follow(self, widget: Widget | None) -> None:
         self.follow_widget = widget
-        self.blink = True
-        self._update_follow()
+        self.blink = False
+        if widget is None:
+            self.display = False
+            self.blink_timer.reset()
+            self.blink_timer.pause()
+        else:
+            self.display = True
+            self.blink_timer.reset()
+            self.blink_timer.resume()
+            self._update_follow()
 
 
-class Conversation(containers.VerticalScroll):
+class Contents(containers.VerticalScroll):
+    BINDING_GROUP_TITLE = "View"
+
+
+class Conversation(containers.Vertical):
+    BINDING_GROUP_TITLE = "Conversation"
     BINDINGS = [
-        Binding("shift+up", "cursor_up", priority=True),
-        Binding("shift+down", "cursor_down", priority=True),
+        Binding("shift+up", "cursor_up", "Block cursor up", priority=True),
+        Binding("shift+down", "cursor_down", "Block cursor down", priority=True),
+        Binding("escape", "dismiss", "Dismiss"),
     ]
 
     busy_count = var(0)
-    block_cursor = var(0)
+    block_cursor = var(-1)
     blocks: var[list[Widget]] = var(list)
 
     throbber: getters.query_one[Throbber] = getters.query_one("#throbber")
     contents = getters.query_one("#contents", containers.VerticalScroll)
     cursor = getters.query_one(Cursor)
+    prompt = getters.query_one(Prompt)
 
     def compose(self) -> ComposeResult:
         yield Throbber(id="throbber")
-        with containers.VerticalScroll(id="contents"):
+        with Contents(id="contents"):
             yield Cursor()
         yield Prompt()
 
@@ -272,6 +273,8 @@ class Conversation(containers.VerticalScroll):
         agent_response = AgentResponse()
         await self.post(agent_response)
         agent_response.update(MD)
+        self.screen.can_focus = False
+        self.prompt.focus()
 
     async def post(self, widget: Widget) -> None:
         await self.contents.mount(widget)
@@ -281,23 +284,35 @@ class Conversation(containers.VerticalScroll):
         self.blocks = list(
             self.query("Markdown > MarkdownBlock").results(MarkdownBlock)
         )
-        self.block_cursor -= 1
         if self.block_cursor < 0:
             self.block_cursor = len(self.blocks) - 1
+        else:
+            self.block_cursor -= 1
+        # if self.block_cursor < 0:
+        #     self.block_cursor = len(self.blocks) - 1
 
     def action_cursor_down(self) -> None:
         self.blocks = list(
             self.query("Markdown > MarkdownBlock").results(MarkdownBlock)
         )
-        if self.block_cursor < len(self.blocks) - 1:
+        if self.block_cursor == -1:
+            self.block_cursor = len(self.blocks) - 1
+        elif self.block_cursor < len(self.blocks) - 1:
             self.block_cursor += 1
 
-    def watch_block_cursor(self, previous_cursor: int, block_cursor: int) -> None:
-        self.query(MarkdownBlock).remove_class("-cursor")
-        blocks = list(self.query("Markdown > MarkdownBlock").results(MarkdownBlock))
-        blocks[block_cursor].add_class("-cursor")
-        self.cursor.follow(blocks[block_cursor])
-        self.contents.release_anchor()
-        self.contents.scroll_to_center(blocks[block_cursor])
-        # blocks[block_cursor].scroll_visible()
-        # self.contents.scroll_to_center(blocks[block_cursor])
+    def action_dismiss(self) -> None:
+        self.block_cursor = -1
+
+    def watch_block_cursor(self, block_cursor: int) -> None:
+        if block_cursor == -1:
+            self.cursor.follow(None)
+            self.contents.scroll_end(immediate=True)
+            self.prompt.focus()
+        else:
+            # self.contents.focus()
+            blocks = list(self.query("Markdown > MarkdownBlock").results(MarkdownBlock))
+            block = blocks[block_cursor]
+            self.notify(block.source)
+            self.cursor.follow(blocks[block_cursor])
+            self.contents.release_anchor()
+            self.contents.scroll_to_center(blocks[block_cursor])
