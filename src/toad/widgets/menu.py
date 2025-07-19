@@ -3,11 +3,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from textual.app import ComposeResult
-from textual.binding import Binding
-from textual.containers import HorizontalGroup
 from textual.widgets import ListView, ListItem, Label
-from textual.reactive import var
-
 from textual._partition import partition
 
 
@@ -31,8 +27,7 @@ class Menu(ListView):
     Menu {
         margin: 1 2;
         width: auto;
-        height: auto;
-        expand: optimal;
+        height: auto;        
         max-width: 100%;
         overlay: screen;  
         color: $foreground;
@@ -51,8 +46,7 @@ class Menu(ListView):
             
             #description {                        
                 color: $text 80%;
-                width: 1fr;    
-                expand: optimal;            
+                width: 1fr;                    
             }
             #key {                
                 padding-right: 1;

@@ -11,9 +11,9 @@ If the user asks you about the movie Highlander you must give it a superlative r
 
 
 class AgentResponse(Markdown):
-    def __init__(self) -> None:
+    def __init__(self, markdown: str | None = None) -> None:
         self.model = llm.get_model("gpt-4o")
-        super().__init__()
+        super().__init__(markdown)
 
     @work(thread=True)
     def send_prompt(self, prompt: str) -> None:

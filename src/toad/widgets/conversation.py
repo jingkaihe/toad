@@ -1,14 +1,12 @@
-from functools import partial
 from textual import on
 from textual.app import ComposeResult
 from textual import containers
 from textual import getters
 from textual.binding import Binding
 from textual.widget import Widget
-from textual.widgets import Markdown, Static
+from textual.widgets import Static
 from textual.widgets._markdown import MarkdownBlock
 from textual.geometry import Offset
-from textual.timer import Timer
 
 from textual.reactive import var
 
@@ -196,7 +194,7 @@ class Cursor(Static):
     def on_mount(self) -> None:
         self.display = False
         self.blink_timer = self.set_interval(0.5, self._update_blink, pause=True)
-        self.set_interval(0.2, self._update_follow)
+        self.set_interval(0.4, self._update_follow)
 
     def _update_blink(self) -> None:
         self.blink = not self.blink
@@ -279,17 +277,16 @@ class Conversation(containers.Vertical):
         self.throbber.set_class(busy > 0, "-busy")
 
     async def on_mount(self) -> None:
-        self.contents.anchor()
-        await self.post(Welcome())
+        await self.post(Welcome(), anchor=False)
         agent_response = AgentResponse()
-        await self.post(agent_response)
-        agent_response.update(MD)
+        await self.post(agent_response, anchor=True)
+        await agent_response.update(MD)
         self.screen.can_focus = False
-        self.prompt.focus()
 
-    async def post(self, widget: Widget) -> None:
+    async def post(self, widget: Widget, anchor: bool = False) -> None:
         await self.contents.mount(widget)
-        self.contents.anchor()
+        if anchor:
+            self.contents.anchor()
 
     def action_cursor_up(self) -> None:
         self.blocks = list(
