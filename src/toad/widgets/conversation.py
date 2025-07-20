@@ -1,3 +1,4 @@
+from contextlib import suppress
 from textual import on
 from textual.app import ComposeResult
 from textual import containers
@@ -8,13 +9,14 @@ from textual.widget import Widget
 from textual.widgets import Static
 from textual.widgets._markdown import MarkdownBlock
 from textual.geometry import Offset
-
 from textual.reactive import var
+from textual.css.query import NoMatches
 
+from textual._profile import timer
 
 from toad import messages
 from toad.widgets.menu import Menu
-from toad.widgets.prompt import Prompt
+from toad.widgets.prompt import MarkdownTextArea, Prompt
 from toad.widgets.throbber import Throbber
 from toad.widgets.welcome import Welcome
 from toad.widgets.user_input import UserInput
@@ -223,26 +225,29 @@ class Cursor(Static):
             self._update_follow()
 
 
-class Contents(containers.VerticalScroll):
+class Contents(containers.VerticalScroll, can_focus=True):
     BINDING_GROUP_TITLE = "View"
+    BINDINGS = [
+        Binding("end", "screen.focus_prompt", "Focus prompt"),
+    ]
 
     @on(events.Focus)
     def on_focus(self) -> None:
-        self.visible = True
+        self.query_one(Cursor).visible = True
 
 
 class Conversation(containers.Vertical):
     BINDING_GROUP_TITLE = "Conversation"
     BINDINGS = [
-        Binding("shift+up", "cursor_up", "Block cursor up", priority=True),
-        Binding("shift+down", "cursor_down", "Block cursor down", priority=True),
+        Binding("alt+up", "cursor_up", "Block cursor up", priority=True),
+        Binding("alt+down", "cursor_down", "Block cursor down", priority=True),
         Binding("enter", "select_block", "Select block"),
         Binding("escape", "dismiss", "Dismiss"),
     ]
 
     busy_count = var(0)
     block_cursor = var(-1)
-    blocks: var[list[Widget]] = var(list)
+    _blocks: var[list[MarkdownBlock] | None] = var(None)
 
     throbber: getters.query_one[Throbber] = getters.query_one("#throbber")
     contents = getters.query_one("#contents", containers.VerticalScroll)
@@ -254,6 +259,14 @@ class Conversation(containers.Vertical):
         with Contents(id="contents"):
             yield Cursor()
         yield Prompt()
+
+    @property
+    def cursor_block(self) -> MarkdownBlock | None:
+        """The block next to the cursor, or `None` if no block cursor."""
+        blocks = self.blocks
+        if self.block_cursor < 0 or self.block_cursor >= len(blocks):
+            return None
+        return blocks[self.block_cursor]
 
     @on(messages.WorkStarted)
     def on_work_started(self) -> None:
@@ -274,8 +287,13 @@ class Conversation(containers.Vertical):
     async def on_menu_option_selected(self, event: Menu.OptionSelected) -> None:
         await self.run_action(event.action)
 
-    @on(events.DescendantBlur)
+    @on(events.DescendantFocus)
     def on_descendant_focus(self, event: events.DescendantFocus):
+        if isinstance(event.widget, MarkdownTextArea):
+            self.block_cursor = -1
+
+    @on(events.DescendantBlur)
+    def on_descendant_blur(self, event: events.DescendantBlur):
         if isinstance(event.widget, Contents):
             self.cursor.visible = False
 
@@ -295,44 +313,89 @@ class Conversation(containers.Vertical):
         await agent_response.update(MD)
         self.screen.can_focus = False
 
+    async def on_click(self, event: events.Click) -> None:
+        if event.widget is not None:
+            markdown_block = event.widget
+            try:
+                if not isinstance(
+                    markdown_block, MarkdownBlock
+                ) or not markdown_block.has_class("level-0"):
+                    markdown_block = event.widget.query_ancestor(
+                        "MarkdownBlock.level-0", MarkdownBlock
+                    )
+
+            except NoMatches:
+                pass
+            else:
+                with suppress(ValueError):
+                    clicked_block_index = self.blocks.index(markdown_block)
+                    if self.block_cursor == clicked_block_index:
+                        pass
+                        # await self.action_select_block()
+                    else:
+                        self.block_cursor = clicked_block_index
+
+        # self.notify(str(event.widget))
+
     async def post(self, widget: Widget, anchor: bool = False) -> None:
+        self._blocks = None
         await self.contents.mount(widget)
         if anchor:
             self.contents.anchor()
 
+    @property
+    def blocks(self) -> list[MarkdownBlock]:
+        # TODO: cache this
+        if self._blocks is None:
+            self._blocks = [
+                block
+                for response in self.contents.query_children(AgentResponse)
+                for block in response.query_children(MarkdownBlock)
+            ]
+        return self._blocks
+
     def action_cursor_up(self) -> None:
-        self.blocks = list(
-            self.query("Markdown > MarkdownBlock").results(MarkdownBlock)
-        )
         if self.block_cursor < 0:
             self.block_cursor = len(self.blocks) - 1
-            self.contents.focus()
         else:
             self.block_cursor -= 1
 
     def action_cursor_down(self) -> None:
-        self.blocks = list(
-            self.query("Markdown > MarkdownBlock").results(MarkdownBlock)
-        )
         if self.block_cursor == -1:
             self.block_cursor = len(self.blocks) - 1
-        elif self.block_cursor < len(self.blocks) - 1:
-            self.block_cursor += 1
+        else:
+            if self.block_cursor < len(self.blocks) - 1:
+                self.block_cursor += 1
+            else:
+                self.block_cursor = -1
 
     def action_dismiss(self) -> None:
         self.block_cursor = -1
 
+    def focus_prompt(self) -> None:
+        self.block_cursor = -1
+
     async def action_select_block(self) -> None:
         block = self.blocks[self.block_cursor]
-        if (
-            block.name is None
-            or (menu_options := CONVERSATION_MENUS.get(block.name, None)) is None
-        ):
+        if block.name is None:
             self.app.bell()
             return
-        menu = Menu(menu_options)
+        menu_options = CONVERSATION_MENUS.get(block.name, [])
+        menu = Menu(
+            [
+                Menu.Item("explain", "Explain this", "e"),
+                Menu.Item("copy_to_clipboard", "Copy to clipboard", "c"),
+                Menu.Item("copy_to_prompt", "Copy to prompt", "p"),
+                *menu_options,
+            ]
+        )
         await self.contents.mount(menu, before=block)
         menu.focus(scroll_visible=False)
+
+    def action_copy_to_clipboard(self) -> None:
+        if (block := self.cursor_block) is not None and block.source:
+            self.app.copy_to_clipboard(block.source)
+            self.notify("Copied to clipboard")
 
     def watch_block_cursor(self, block_cursor: int) -> None:
         if block_cursor == -1:
@@ -340,10 +403,10 @@ class Conversation(containers.Vertical):
             self.contents.scroll_end(immediate=True)
             self.prompt.focus()
         else:
-            # self.contents.focus()
-            blocks = list(self.query("Markdown > MarkdownBlock").results(MarkdownBlock))
+            self.contents.focus()
+            self.cursor.visible = True
+            blocks = self.blocks
             block = blocks[block_cursor]
-            # self.notify(block.source)
             self.cursor.follow(block)
             self.contents.release_anchor()
             self.contents.scroll_to_center(blocks[block_cursor], immediate=True)

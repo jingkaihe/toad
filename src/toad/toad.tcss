@@ -29,7 +29,7 @@ Conversation {
     }
     
     
-    Markdown {
+    AgentResponse {
        padding: 0 2;       
     }
 
@@ -63,6 +63,7 @@ Welcome {
 
 Prompt {
     padding-top: 1;
+    max-height: 50%;
     CondensedPath {
         margin: 1 1;
         width: 1fr;
@@ -76,7 +77,8 @@ Prompt {
 UserInput {
     border-left: vkey $primary;
     background: $foreground 4%;
-    padding: 1 2;
+    padding: 1 2;   
+    margin: 1 0; 
     & > MarkdownBlock:last-child {
         margin-bottom: 0;
     }

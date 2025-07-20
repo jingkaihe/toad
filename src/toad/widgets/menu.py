@@ -11,6 +11,10 @@ from textual._partition import partition
 from textual import events
 
 
+class NonSelectableLabel(Label):
+    ALLOW_SELECT = False
+
+
 class MenuOption(ListItem):
     ALLOW_SELECT = False
 
@@ -21,8 +25,8 @@ class MenuOption(ListItem):
         super().__init__(classes="-has-key" if key else "-no_key")
 
     def compose(self) -> ComposeResult:
-        yield Label(self._key or " ", id="key")
-        yield Label(self._description, id="description")
+        yield NonSelectableLabel(self._key or " ", id="key")
+        yield NonSelectableLabel(self._description, id="description")
 
 
 class Menu(ListView, can_focus=True):
@@ -37,7 +41,7 @@ class Menu(ListView, can_focus=True):
         overlay: screen;  
         color: $foreground;
         background: $panel-darken-1;
-        border: heavy $foreground;
+        border: solid $foreground;
    
         & > MenuOption {                    
             layout: horizontal;            
@@ -114,6 +118,7 @@ class Menu(ListView, can_focus=True):
     async def activate_index(self, index: int) -> None:
         action = self._options[index].action
         self.post_message(self.OptionSelected(action))
+        await self.remove()
 
     async def action_dismiss(self) -> None:
         self.post_message(self.Dismissed())

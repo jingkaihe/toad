@@ -12,6 +12,10 @@ class MainScreen(Screen):
     BINDING_GROUP_TITLE = "Screen"
     busy_count = var(0)
     throbber: getters.query_one[Throbber] = getters.query_one("#throbber")
+    conversation = getters.query_one(Conversation)
 
     def compose(self) -> ComposeResult:
         yield Conversation()
+
+    def action_focus_prompt(self) -> None:
+        self.conversation.focus_prompt()
