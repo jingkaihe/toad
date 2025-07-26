@@ -21,7 +21,6 @@ from toad.widgets.prompt import MarkdownTextArea, Prompt
 from toad.widgets.throbber import Throbber
 from toad.widgets.welcome import Welcome
 from toad.widgets.user_input import UserInput
-from toad.widgets.agent_response import AgentResponse
 from toad.widgets.explain import Explain
 from toad.widgets.run_output import RunOutput
 
@@ -299,6 +298,7 @@ class Conversation(containers.Vertical):
     cursor = getters.query_one(Cursor)
     prompt = getters.query_one(Prompt)
     llm_model = var(lambda: llm.get_model("gpt-4o"))
+    conversation = var(lambda: llm.get_model("gpt-4o").conversation())
 
     def compose(self) -> ComposeResult:
         yield Throbber(id="throbber")
@@ -324,8 +324,10 @@ class Conversation(containers.Vertical):
 
     @on(messages.UserInputSubmitted)
     async def on_user_input_submitted(self, event: messages.UserInputSubmitted) -> None:
+        from toad.widgets.agent_response import AgentResponse
+
         await self.post(UserInput(event.body))
-        agent_response = AgentResponse(self.llm_model)
+        agent_response = AgentResponse(self.conversation)
         await self.post(agent_response)
         agent_response.send_prompt(event.body)
 
@@ -356,16 +358,6 @@ class Conversation(containers.Vertical):
     async def on_mount(self) -> None:
         self.screen.can_focus = False
         await self.post(Welcome(), anchor=False)
-        agent_response = AgentResponse(self.llm_model)
-        await self.post(agent_response, anchor=True)
-        chunk = 8
-
-        stream = AgentResponse.get_stream(agent_response)
-        try:
-            for position in range(0, len(MD), chunk):
-                await stream.write(MD[position : position + chunk])
-        finally:
-            await stream.stop()
 
     def on_click(self, event: events.Click) -> None:
         if event.widget is not None:
@@ -399,6 +391,8 @@ class Conversation(containers.Vertical):
 
     @property
     def blocks(self) -> list[MarkdownBlock]:
+        from toad.widgets.agent_response import AgentResponse
+
         if self._blocks is None or self.busy_count:
             self._blocks = [
                 block
