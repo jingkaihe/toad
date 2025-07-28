@@ -32,102 +32,19 @@ class SchemaDict(TypedDict, total=False):
 
 type SettingsType = dict[str, object]
 
-SCHEMA: list[SchemaDict] = [
-    {
-        "key": "ui",
-        "title": "User interface settings",
-        "type": "object",
-        "fields": [
-            {
-                "key": "column",
-                "title": "Enable column?",
-                "help": "Enable for a fixed column size. Disable to use the full screen width.",
-                "type": "boolean",
-                "default": True,
-            },
-            {
-                "key": "column-width",
-                "title": "Width of the column",
-                "help": "Width of the column if enabled.",
-                "type": "integer",
-                "default": 100,
-                "validate": [{"type": "minimum", "value": 40}],
-            },
-            {
-                "key": "theme",
-                "title": "Theme",
-                "help": "One of the builtin Textual themes.",
-                "type": "choices",
-                "default": "dracula",
-                "validate": [
-                    {
-                        "type": "choices",
-                        "choices": [
-                            "textual-dark",
-                            "textual-light",
-                            "nord",
-                            "gruvbox",
-                            "catppuccin-mocha",
-                            "dracula",
-                            "tokyo-night",
-                            "monokai",
-                            "flexoki",
-                            "catppuccin-late",
-                            "solarized-light",
-                        ],
-                    }
-                ],
-            },
-        ],
-    },
-    {
-        "key": "user",
-        "title": "User information",
-        "help": "Your details.",
-        "type": "object",
-        "fields": [
-            {
-                "key": "name",
-                "title": "Your name",
-                "type": "string",
-                "default": "",
-            },
-            {
-                "key": "email",
-                "title": "Your email",
-                "type": "string",
-                "validate": [{"type": "is_email"}],
-                "default": "",
-            },
-        ],
-    },
-    {
-        "key": "accounts",
-        "title": "User accounts",
-        "help": "Account information used by AI services.",
-        "type": "list",
-        "default": [
-            {"key": "anthropic", "apikey": "$ANTHROPIC_API_KEY"},
-            {"key": "openai", "apikey": "$OPENAI_API_KEY"},
-        ],
-        "fields": [
-            {
-                "type": "string",
-                "key": "apikey",
-                "title": "API Key",
-            }
-        ],
-    },
-]
 
 INPUT_TYPES = {"boolean", "integer", "string", "choices"}
 
 
-class InvalidKey(Exception):
+class SettingsError(Exception):
+    """Base class for settings related errors."""
+
+
+class InvalidKey(SettingsError):
     """The key is not in the schema."""
 
 
-class InvalidValue(Exception):
+class InvalidValue(SettingsError):
     """The value was not of the expected type."""
 
 
@@ -275,9 +192,29 @@ class Schema:
         return form_settings
 
 
+class Settings:
+    """Stores schema backed settings."""
+
+    def __init__(self, schema: Schema, settings: dict[str, object]) -> None:
+        self._schema = schema
+        self._settings = settings
+
+    def get[ExpectType](
+        self, key: str, expect_type: type[ExpectType] = object
+    ) -> ExpectType:
+        from os.path import expandvars
+
+        setting = get_setting(self._settings, key, expect_type=expect_type)
+        if isinstance(setting, str):
+            setting = expandvars(setting)
+        return setting
+
+
 if __name__ == "__main__":
     from rich import print
     from rich.traceback import install
+
+    from toad.settings_schema import SCHEMA
 
     install(show_locals=True, width=None)
 

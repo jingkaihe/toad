@@ -24,6 +24,10 @@ Conversation {
     #     }  
     # }
     
+    .note {
+        padding: 0 2;
+    }
+
     #contents {
         width: 1fr;
         overflow: hidden auto;     

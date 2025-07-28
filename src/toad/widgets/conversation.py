@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 import asyncio
 from contextlib import suppress
 from textual import on, work
@@ -24,6 +27,9 @@ from toad.widgets.explain import Explain
 from toad.widgets.run_output import RunOutput
 
 from toad.menus import CONVERSATION_MENUS
+
+if TYPE_CHECKING:
+    from toad.app import ToadApp
 
 MD = """\
 # Textual Markdown Browser - Demo
@@ -299,6 +305,8 @@ class Conversation(containers.Vertical):
     llm_model = var(lambda: llm.get_model("gpt-4o"))
     conversation = var(lambda: llm.get_model("gpt-4o").conversation())
 
+    app: ToadApp
+
     def compose(self) -> ComposeResult:
         yield Throbber(id="throbber")
         with Contents(id="contents"):
@@ -360,6 +368,12 @@ class Conversation(containers.Vertical):
         from toad.widgets.welcome import Welcome
 
         await self.post(Welcome(), anchor=False)
+        await self.post(
+            Static(
+                f"Settings read from [$text-success]'{self.app.settings_path}'",
+                classes="note",
+            )
+        )
 
     def on_click(self, event: events.Click) -> None:
         if event.widget is not None:
