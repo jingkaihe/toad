@@ -4,7 +4,7 @@ Welcome to the Toad repository!
 
 This repository is currently private.
 If you are here, it is because you had a personal invite from me, and I value your opinion.
-I'm looking for early feedback, and potential collaboration in the near future.
+I'm looking for early feedback, and potential collaboration in the future (if you're interested).
 
 Please use the Discussions tab for your feedback.
 Avoid issues and PRs for now, unless we've agreed on them in the Discussions tab.
