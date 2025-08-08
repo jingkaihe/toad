@@ -253,12 +253,12 @@ Explain {
 RunOutput {
     border-left: vkey $secondary;
     background: $foreground 4%;
-    padding: 1 2 0 1;   
+    padding: 0 1;   
     margin: 1 0;    
-    overflow: auto;
-    & > Label {
-        width: auto;
-    }
+    # overflow: auto;
+    # & > Label {
+    #     width: auto;
+    # }
 }
 
 Footer {

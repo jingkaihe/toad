@@ -7,33 +7,17 @@ import re
 from typing import Generator, Iterable, NamedTuple
 from textual.color import Color
 from textual.style import Style
-from textual.content import Content, Span
+from textual.content import Content
 
 from toad._stream_parser import (
     StreamParser,
-    ParseResult,
     SeparatorToken,
     StreamRead,
     Token,
-    MatchToken,
     PatternToken,
     Pattern,
     PatternCheck,
 )
-
-RE_ANSI = r"""
-\x1b\[(?:\](.*?)\x1b\\)|  # OSC
-\x1b\[(?:([(@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))  # SGR
-"""
-
-r"""
-For Control Sequence Introducer, or CSI, commands, the ESC\
-    [ (written as \e[, \x1b[ or \033[ in several programming languages
-      is followed by any number (including none) of "parameter bytes"
-      in the range 0x30–0x3F (ASCII 0–9:;<=>?), then by any number of
-      "intermediate bytes" in the range 0x20–0x2F (ASCII space and !"#$%&'()*+,-./),
-      then finally by a single "final byte" in the range 0x40–0x7E (ASCII @A–Z[\]^_`a–z{|}~).[16]: 5.4 
-"""
 
 
 class CSIPattern(Pattern):
@@ -68,7 +52,6 @@ class CSIPattern(Pattern):
         if character in self.FINAL_BYTE:
             return self.Match(parameter.getvalue(), "", character)
 
-        intermediate.write(character)
         while True:
             intermediate.write(character)
             if (character := (yield)) not in intermediate_bytes:
@@ -78,7 +61,11 @@ class CSIPattern(Pattern):
         if final_byte not in self.FINAL_BYTE:
             return False
 
-        return self.Match(parameter.getvalue(), intermediate.getvalue(), final_byte)
+        return self.Match(
+            parameter.getvalue(),
+            intermediate.getvalue(),
+            final_byte,
+        )
 
 
 class OSCPattern(Pattern):
@@ -89,45 +76,6 @@ class OSCPattern(Pattern):
         if (yield) != "]":
             return False
         return self.Match("]")
-
-
-# class _AnsiToken(NamedTuple):
-#     """Result of ansi tokenized string."""
-
-#     plain: str = ""
-#     sgr: Optional[str] = ""
-#     osc: Optional[str] = ""
-
-
-# def _ansi_tokenize(ansi_text: str) -> Iterable[_AnsiToken]:
-#     """Tokenize a string in to plain text and ANSI codes.
-
-#     Args:
-#         ansi_text (str): A String containing ANSI codes.
-
-#     Yields:
-#         AnsiToken: A named tuple of (plain, sgr, osc)
-#     """
-
-#     position = 0
-#     sgr: Optional[str]
-#     osc: Optional[str]
-#     for match in re_ansi.finditer(ansi_text):
-#         start, end = match.span(0)
-#         osc, sgr = match.groups()
-#         if start > position:
-#             yield _AnsiToken(ansi_text[position:start])
-#         if sgr:
-#             if sgr == "(":
-#                 position = end + 1
-#                 continue
-#             if sgr.endswith("m"):
-#                 yield _AnsiToken("", sgr[1:-1], osc)
-#         else:
-#             yield _AnsiToken("", sgr, osc)
-#         position = end
-#     if position < len(ansi_text):
-#         yield _AnsiToken(ansi_text[position:])
 
 
 SGR_STYLE_MAP = {
@@ -273,20 +221,259 @@ ANSI_COLORS = [
     "ansi_bright_magenta",
     "ansi_bright_cyan",
     "ansi_bright_white",
+    "rgb(0,0,0)",
+    "rgb(0,0,95)",
+    "rgb(0,0,135)",
+    "rgb(0,0,175)",
+    "rgb(0,0,215)",
+    "rgb(0,0,255)",
+    "rgb(0,95,0)",
+    "rgb(0,95,95)",
+    "rgb(0,95,135)",
+    "rgb(0,95,175)",
+    "rgb(0,95,215)",
+    "rgb(0,95,255)",
+    "rgb(0,135,0)",
+    "rgb(0,135,95)",
+    "rgb(0,135,135)",
+    "rgb(0,135,175)",
+    "rgb(0,135,215)",
+    "rgb(0,135,255)",
+    "rgb(0,175,0)",
+    "rgb(0,175,95)",
+    "rgb(0,175,135)",
+    "rgb(0,175,175)",
+    "rgb(0,175,215)",
+    "rgb(0,175,255)",
+    "rgb(0,215,0)",
+    "rgb(0,215,95)",
+    "rgb(0,215,135)",
+    "rgb(0,215,175)",
+    "rgb(0,215,215)",
+    "rgb(0,215,255)",
+    "rgb(0,255,0)",
+    "rgb(0,255,95)",
+    "rgb(0,255,135)",
+    "rgb(0,255,175)",
+    "rgb(0,255,215)",
+    "rgb(0,255,255)",
+    "rgb(95,0,0)",
+    "rgb(95,0,95)",
+    "rgb(95,0,135)",
+    "rgb(95,0,175)",
+    "rgb(95,0,215)",
+    "rgb(95,0,255)",
+    "rgb(95,95,0)",
+    "rgb(95,95,95)",
+    "rgb(95,95,135)",
+    "rgb(95,95,175)",
+    "rgb(95,95,215)",
+    "rgb(95,95,255)",
+    "rgb(95,135,0)",
+    "rgb(95,135,95)",
+    "rgb(95,135,135)",
+    "rgb(95,135,175)",
+    "rgb(95,135,215)",
+    "rgb(95,135,255)",
+    "rgb(95,175,0)",
+    "rgb(95,175,95)",
+    "rgb(95,175,135)",
+    "rgb(95,175,175)",
+    "rgb(95,175,215)",
+    "rgb(95,175,255)",
+    "rgb(95,215,0)",
+    "rgb(95,215,95)",
+    "rgb(95,215,135)",
+    "rgb(95,215,175)",
+    "rgb(95,215,215)",
+    "rgb(95,215,255)",
+    "rgb(95,255,0)",
+    "rgb(95,255,95)",
+    "rgb(95,255,135)",
+    "rgb(95,255,175)",
+    "rgb(95,255,215)",
+    "rgb(95,255,255)",
+    "rgb(135,0,0)",
+    "rgb(135,0,95)",
+    "rgb(135,0,135)",
+    "rgb(135,0,175)",
+    "rgb(135,0,215)",
+    "rgb(135,0,255)",
+    "rgb(135,95,0)",
+    "rgb(135,95,95)",
+    "rgb(135,95,135)",
+    "rgb(135,95,175)",
+    "rgb(135,95,215)",
+    "rgb(135,95,255)",
+    "rgb(135,135,0)",
+    "rgb(135,135,95)",
+    "rgb(135,135,135)",
+    "rgb(135,135,175)",
+    "rgb(135,135,215)",
+    "rgb(135,135,255)",
+    "rgb(135,175,0)",
+    "rgb(135,175,95)",
+    "rgb(135,175,135)",
+    "rgb(135,175,175)",
+    "rgb(135,175,215)",
+    "rgb(135,175,255)",
+    "rgb(135,215,0)",
+    "rgb(135,215,95)",
+    "rgb(135,215,135)",
+    "rgb(135,215,175)",
+    "rgb(135,215,215)",
+    "rgb(135,215,255)",
+    "rgb(135,255,0)",
+    "rgb(135,255,95)",
+    "rgb(135,255,135)",
+    "rgb(135,255,175)",
+    "rgb(135,255,215)",
+    "rgb(135,255,255)",
+    "rgb(175,0,0)",
+    "rgb(175,0,95)",
+    "rgb(175,0,135)",
+    "rgb(175,0,175)",
+    "rgb(175,0,215)",
+    "rgb(175,0,255)",
+    "rgb(175,95,0)",
+    "rgb(175,95,95)",
+    "rgb(175,95,135)",
+    "rgb(175,95,175)",
+    "rgb(175,95,215)",
+    "rgb(175,95,255)",
+    "rgb(175,135,0)",
+    "rgb(175,135,95)",
+    "rgb(175,135,135)",
+    "rgb(175,135,175)",
+    "rgb(175,135,215)",
+    "rgb(175,135,255)",
+    "rgb(175,175,0)",
+    "rgb(175,175,95)",
+    "rgb(175,175,135)",
+    "rgb(175,175,175)",
+    "rgb(175,175,215)",
+    "rgb(175,175,255)",
+    "rgb(175,215,0)",
+    "rgb(175,215,95)",
+    "rgb(175,215,135)",
+    "rgb(175,215,175)",
+    "rgb(175,215,215)",
+    "rgb(175,215,255)",
+    "rgb(175,255,0)",
+    "rgb(175,255,95)",
+    "rgb(175,255,135)",
+    "rgb(175,255,175)",
+    "rgb(175,255,215)",
+    "rgb(175,255,255)",
+    "rgb(215,0,0)",
+    "rgb(215,0,95)",
+    "rgb(215,0,135)",
+    "rgb(215,0,175)",
+    "rgb(215,0,215)",
+    "rgb(215,0,255)",
+    "rgb(215,95,0)",
+    "rgb(215,95,95)",
+    "rgb(215,95,135)",
+    "rgb(215,95,175)",
+    "rgb(215,95,215)",
+    "rgb(215,95,255)",
+    "rgb(215,135,0)",
+    "rgb(215,135,95)",
+    "rgb(215,135,135)",
+    "rgb(215,135,175)",
+    "rgb(215,135,215)",
+    "rgb(215,135,255)",
+    "rgb(215,175,0)",
+    "rgb(215,175,95)",
+    "rgb(215,175,135)",
+    "rgb(215,175,175)",
+    "rgb(215,175,215)",
+    "rgb(215,175,255)",
+    "rgb(215,215,0)",
+    "rgb(215,215,95)",
+    "rgb(215,215,135)",
+    "rgb(215,215,175)",
+    "rgb(215,215,215)",
+    "rgb(215,215,255)",
+    "rgb(215,255,0)",
+    "rgb(215,255,95)",
+    "rgb(215,255,135)",
+    "rgb(215,255,175)",
+    "rgb(215,255,215)",
+    "rgb(215,255,255)",
+    "rgb(255,0,0)",
+    "rgb(255,0,95)",
+    "rgb(255,0,135)",
+    "rgb(255,0,175)",
+    "rgb(255,0,215)",
+    "rgb(255,0,255)",
+    "rgb(255,95,0)",
+    "rgb(255,95,95)",
+    "rgb(255,95,135)",
+    "rgb(255,95,175)",
+    "rgb(255,95,215)",
+    "rgb(255,95,255)",
+    "rgb(255,135,0)",
+    "rgb(255,135,95)",
+    "rgb(255,135,135)",
+    "rgb(255,135,175)",
+    "rgb(255,135,215)",
+    "rgb(255,135,255)",
+    "rgb(255,175,0)",
+    "rgb(255,175,95)",
+    "rgb(255,175,135)",
+    "rgb(255,175,175)",
+    "rgb(255,175,215)",
+    "rgb(255,175,255)",
+    "rgb(255,215,0)",
+    "rgb(255,215,95)",
+    "rgb(255,215,135)",
+    "rgb(255,215,175)",
+    "rgb(255,215,215)",
+    "rgb(255,215,255)",
+    "rgb(255,255,0)",
+    "rgb(255,255,95)",
+    "rgb(255,255,135)",
+    "rgb(255,255,175)",
+    "rgb(255,255,215)",
+    "rgb(255,255,255)",
+    "rgb(8,8,8)",
+    "rgb(18,18,18)",
+    "rgb(28,28,28)",
+    "rgb(38,38,38)",
+    "rgb(48,48,48)",
+    "rgb(58,58,58)",
+    "rgb(68,68,68)",
+    "rgb(78,78,78)",
+    "rgb(88,88,88)",
+    "rgb(98,98,98)",
+    "rgb(108,108,108)",
+    "rgb(118,118,118)",
+    "rgb(128,128,128)",
+    "rgb(138,138,138)",
+    "rgb(148,148,148)",
+    "rgb(158,158,158)",
+    "rgb(168,168,168)",
+    "rgb(178,178,178)",
+    "rgb(188,188,188)",
+    "rgb(198,198,198)",
+    "rgb(208,208,208)",
+    "rgb(218,218,218)",
+    "rgb(228,228,228)",
+    "rgb(238,238,238)",
 ]
+
+
+class ANSISegment(NamedTuple):
+    delta_x: int = 0
+    delta_y: int = 0
+    content: Content | None = None
 
 
 class ANSIStream:
     def __init__(self) -> None:
         self.parser = ANSIParser()
-        self.cursor_x = 0
-        self.cursor_y = 0
-        self.line_start = 0
-        self.lines: list[list[Content]] = []
         self.style = Style()
-
-    def __rich__(self) -> Content:
-        return Content("\n").join(line for line in self)
 
     @classmethod
     def parse_sgr(cls, sgr: str, style: Style) -> Style:
@@ -334,15 +521,14 @@ class ANSIStream:
                         )
         return style
 
-    def feed(self, text: str) -> None:
+    def feed(self, text: str) -> Iterable[ANSISegment]:
         for token in self.parser.feed(text):
-            self.on_token(token)
+            yield from self.on_token(token)
 
-    def on_token(self, token: ANSIToken) -> None:
+    def on_token(self, token: ANSIToken) -> Iterable[ANSISegment]:
         if isinstance(token, Separator):
             if token.text == "\n":
-                self.cursor_x = 0
-                self.cursor_y += 1
+                yield ANSISegment(0, 1)
 
         elif isinstance(token, OSC):
             osc = token.text
@@ -357,23 +543,11 @@ class ANSIStream:
                 self.style = self.parse_sgr(token.text[2:-1], self.style)
 
         else:
-            while self.cursor_y >= len(self.lines):
-                self.lines.append([Content()])
-            line = self.lines[self.cursor_y]
             if self.style:
-                line.append(Content.styled(str(token), self.style))
+                content = Content.styled(str(token), self.style)
             else:
-                line.append(Content(str(token)))
-
-    def __iter__(self) -> Iterable[Content]:
-        for line_no in range(0, len(self.lines)):
-            yield self.get_line(line_no + self.line_start).simplify()
-
-    def get_line(self, y: int) -> Content:
-        line = self.lines[y]
-        if len(line) != 1:
-            line[:] = [Content.assemble(*line)]
-        return line[0]
+                content = Content(str(token))
+            yield ANSISegment(content.cell_length, 0, content)
 
 
 if __name__ == "__main__":
