@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 from functools import cached_property
 import os
 from typing import TYPE_CHECKING
@@ -16,7 +17,7 @@ from textual.binding import Binding
 from textual.widget import Widget
 from textual.widgets import Static
 from textual.widgets._markdown import MarkdownBlock, MarkdownFence
-from textual.geometry import Offset, Spacing
+from textual.geometry import Offset
 from textual.reactive import var
 from textual.css.query import NoMatches
 from textual.layouts.grid import GridLayout
@@ -616,7 +617,6 @@ class Conversation(containers.Vertical):
 
     @work
     async def execute(self, code: str, language: str) -> None:
-        self.notify(repr(language))
         if language == "python":
             command = "python run"
         elif language == "bash":
@@ -643,10 +643,12 @@ class Conversation(containers.Vertical):
             stderr=asyncio.subprocess.STDOUT,
             env=env,
         )
-        while data := await process.stdout.readline():
-            line = data.decode("utf-8")
-            run_output.write(line)
-            # run_output.output += line
+        unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        decode = unicode_decoder.decode
+        assert process.stdout is not None
+        while data := await process.stdout.read(1024 * 16):
+            run_output.write(decode(data))
+        run_output.write(decode(data, final=True))
 
     def watch_block_cursor(self, block_cursor: int) -> None:
         if block_cursor == -1:

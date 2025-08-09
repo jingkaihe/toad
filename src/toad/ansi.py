@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 import io
 from contextlib import suppress
-from typing import Generator, Iterable, NamedTuple
+from typing import Generator, Iterable, Mapping, NamedTuple, Sequence
 from textual.color import Color
 from textual.style import Style, NULL_STYLE
 from textual.content import Content
@@ -81,7 +81,7 @@ class OSCPattern(Pattern):
         return self.Match("]")
 
 
-SGR_STYLE_MAP: dict[int, Style] = {
+SGR_STYLE_MAP: Mapping[int, Style] = {
     1: Style(bold=True),
     2: Style(dim=True),
     3: Style(italic=True),
@@ -202,7 +202,7 @@ class ANSIParser(StreamParser):
 EMPTY_LINE = Content()
 
 
-ANSI_COLORS = [
+ANSI_COLORS: Sequence[str] = [
     "ansi_black",
     "ansi_red",
     "ansi_green",

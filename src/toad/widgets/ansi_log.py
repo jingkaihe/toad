@@ -1,6 +1,7 @@
 from __future__ import annotations
+from dataclasses import dataclass, field
 import os
-from typing import Sequence, NamedTuple
+from typing import NamedTuple
 
 
 from textual.geometry import Size
@@ -30,12 +31,19 @@ class LineFold(NamedTuple):
     """The content."""
 
 
+@dataclass
+class LineRecord:
+    content: Content
+    folds: list[LineFold] = field(default_factory=list)
+    updates: int = 0
+
+
 class ANSILog(ScrollView, can_focus=True):
     DEFAULT_CSS = """
     ANSILog {
         overflow: auto auto;
         scrollbar-gutter: stable;
-        height: 1fr;
+        height: 1fr;        
     }
     """
 
@@ -54,10 +62,21 @@ class ANSILog(ScrollView, can_focus=True):
 
         self._line_count = 0
 
-        self._lines: dict[int, Content] = {}
+        # Sequence of lines
+        self._lines: list[LineRecord] = []
+
+        # Maps the line index on to the folder lines index
+        self._line_to_fold: list[int] = []
+
+        # List of folded lines, one per line in the widget
         self._folded_lines: list[LineFold] = []
+
+        # Cache of segments
         self._render_line_cache: LRUCache[tuple, Strip] = LRUCache(1000)
+
+        # ANSI stream
         self._ansi_stream = ANSIStream()
+
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
 
     @property
@@ -77,12 +96,7 @@ class ANSILog(ScrollView, can_focus=True):
 
     def notify_style_update(self) -> None:
         self._clear_caches()
-
-    # def get_content_width(self, container: Size, viewport: Size) -> int:
-    #     return max([line.cell_length for line in self._lines.values()])
-
-    # def get_content_height(self, container: Size, viewport: Size, width: int) -> int:
-    #     [line.cell_length // width for line in self._lines.values()]
+        self._reflow()
 
     def allow_select(self) -> bool:
         return True
@@ -96,14 +110,8 @@ class ANSILog(ScrollView, can_focus=True):
         Returns:
             Tuple of extracted text and ending (typically "\n" or " "), or `None` if no text could be extracted.
         """
-        text = "\n".join(
-            content.plain for _line_no, content in sorted(self._lines.items())
-        )
+        text = "\n".join(line_record.content.plain for line_record in self._lines)
         return selection.extract(text), "\n"
-
-    # def selection_updated(self, selection: Selection | None) -> None:
-    #     self._clear_caches()
-    #     self.refresh()
 
     def _clear_caches(self) -> None:
         self._render_line_cache.clear()
@@ -120,14 +128,16 @@ class ANSILog(ScrollView, can_focus=True):
         self.refresh()
 
     def write(self, text: str) -> None:
+        if not text:
+            return
         for delta_x, delta_y, content in self._ansi_stream.feed(text):
             while self.cursor_line >= self.last_line_index:
                 self.add_line(Content())
 
-            line = self._lines[self.cursor_line]
+            line = self._lines[self.cursor_line].content
             if content:
                 if self.cursor_offset == len(line):
-                    line.append(content)
+                    self.update_line(self.cursor_line, content)
                 else:
                     updated_line = Content("").join(
                         [
@@ -140,60 +150,71 @@ class ANSILog(ScrollView, can_focus=True):
 
             self.cursor_line += delta_y
             self.cursor_offset += delta_x
-        self._reflow()
 
-    def _fold_line(
-        self, line: Content, width: int
-    ) -> Sequence[tuple[int, int, Content]]:
+    def _fold_line(self, line_no: int, line: Content, width: int) -> list[LineFold]:
         line_length = line.cell_length
         divide_offsets = list(range(width, line_length, width))
         folded_line = line.divide(divide_offsets)
         offsets = [0, *divide_offsets]
-
         return [
-            (line_offset, offset, line)
+            LineFold(line_no, line_offset, offset, line)
             for line_offset, (offset, line) in enumerate(zip(offsets, folded_line))
         ]
-
-    def _fold_line_no(
-        self, line_no: int, width: int
-    ) -> Sequence[tuple[int, int, Content]]:
-        line = self._lines[line_no]
-        return self._fold_line(line, width)
 
     def _reflow(self) -> None:
         width = self._width
         if not width:
             self._clear_caches()
             return
-        self._folded_lines[:] = [
-            LineFold(line_no, line_offset, offset, line)
-            for line_no in range(self.line_start, self.line_count)
-            for line_offset, offset, line in self._fold_line(
-                self._lines[line_no], width
-            )
-        ]
+
+        folded_lines = self._folded_lines = []
+        folded_lines.clear()
+        self._line_to_fold.clear()
+        for line_no, line in enumerate(self._lines):
+            line.folds[:] = self._fold_line(line_no, line.content, width)
+            self._line_to_fold.append(len(self._folded_lines))
+            self._folded_lines.extend(line.folds)
+
         self.virtual_size = Size(width, len(self._folded_lines))
 
     def add_line(self, content: Content) -> None:
         line_no = self._line_count
         self._line_count += 1
-        self._lines[line_no] = content
+        line_record = LineRecord(
+            content, self._fold_line(line_no, content, self._width)
+        )
+        self._lines.append(line_record)
         width = self._width
 
         if not width:
             return
-        self._folded_lines.extend(
-            [
-                LineFold(line_no, line_offset, offset, line)
-                for line_offset, offset, line in self._fold_line(content, width)
-            ]
-        )
+
+        folds = line_record.folds
+        self._line_to_fold.append(len(self._folded_lines))
+        self._folded_lines.extend(folds)
+
         self.virtual_size = Size(width, len(self._folded_lines))
 
     def update_line(self, line_index: int, line: Content) -> None:
-        line.simplify()
-        self._lines[line_index] = line
+        # line.simplify()
+        line_record = self._lines[line_index]
+        line_record.content = line
+        line_record.folds[:] = self._fold_line(line_index, line, self._width)
+        line_record.updates += 1
+
+        fold_line = self._line_to_fold[line_index]
+        del self._line_to_fold[line_index:]
+        del self._folded_lines[fold_line:]
+
+        for line_no in range(line_index, self.line_count):
+            line_record = self._lines[line_no]
+            self._line_to_fold.append(len(self._folded_lines))
+            for fold in line_record.folds:
+                self._folded_lines.append(fold)
+                self.refresh_line(fold_line)
+                fold_line += 1
+
+        self.virtual_size = Size(self._width, len(self._folded_lines))
 
     def render_line(self, y: int) -> Strip:
         scroll_x, scroll_y = self.scroll_offset
@@ -205,27 +226,34 @@ class ANSILog(ScrollView, can_focus=True):
 
         visual_style = self.visual_style
         rich_style = visual_style.rich_style
-        cache_key = (x, y, width, visual_style)
-        if not selection:
-            cached_strip = self._render_line_cache.get(cache_key)
-            if cached_strip:
-                return cached_strip
 
         try:
             line_no, line_offset, offset, line = self._folded_lines[y]
         except IndexError:
             return Strip.blank(width, rich_style)
 
+        unfolded_line = self._lines[line_no]
+        cache_key = (unfolded_line.updates, y, width, visual_style)
+        if not selection:
+            cached_strip = self._render_line_cache.get(cache_key)
+            if cached_strip:
+                cached_strip = cached_strip.crop_extend(x, x + width, rich_style)
+                return cached_strip
+
         if selection is not None:
             if select_span := selection.get_span(line_no):
-                unfolded_line = self._lines[line_no]
+                unfolded_content = self._lines[line_no].content
                 start, end = select_span
                 if end == -1:
-                    end = len(unfolded_line)
+                    end = len(unfolded_content)
                 selection_style = self.screen.get_visual_style("screen--selection")
-                unfolded_line = unfolded_line.stylize(selection_style, start, end)
+                unfolded_content = unfolded_content.stylize(selection_style, start, end)
                 try:
-                    line = self._fold_line(unfolded_line, width)[line_offset][-1]
+                    line = self._fold_line(
+                        line_no,
+                        unfolded_content,
+                        width,
+                    )[line_offset][-1]
                 except IndexError:
                     pass
 
@@ -234,23 +262,25 @@ class ANSILog(ScrollView, can_focus=True):
         )
 
         strip = strips[0]
-        strip = strip.crop_extend(x, x + width, rich_style)
         strip = strip.apply_offsets(x + offset, line_no)
         if not selection:
             self._render_line_cache[cache_key] = strip
+        strip = strip.crop_extend(x, x + width, rich_style)
         return strip
 
 
 if __name__ == "__main__":
     from textual import work
     from textual.app import App, ComposeResult
-    from rich.console import Console
+
     import asyncio
+
+    import codecs
 
     class ANSIApp(App):
         CSS = """
         ANSILog {
-            height: auto;
+          
         }
         """
 
@@ -271,10 +301,13 @@ if __name__ == "__main__":
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
             )
-            while data := await process.stdout.readline():
-                line = data.decode("utf-8")
+            assert process.stdout is not None
+            unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+            while data := await process.stdout.read(16 * 1024):
+                line = unicode_decoder.decode(data)
                 ansi_log.write(line)
-                # run_output.output += line
+            line = unicode_decoder.decode(b"", final=True)
+            ansi_log.write(line)
 
             # for repeat in range(100):
             #     self.query_one(ANSILog).add_line(
