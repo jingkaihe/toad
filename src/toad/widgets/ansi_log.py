@@ -190,7 +190,7 @@ class ANSILog(ScrollView, can_focus=True):
 
             if delta_x is not None:
                 self.cursor_offset += delta_x
-                while self.cursor_offset >= self._width:
+                while self.cursor_offset > self._width:
                     self.cursor_line += 1
                     self.cursor_offset -= self._width
             if delta_y is not None:
@@ -257,17 +257,18 @@ class ANSILog(ScrollView, can_focus=True):
         del self._line_to_fold[line_index:]
         del self._folded_lines[fold_line:]
 
-        refresh_lines: list[int] = []
+        refresh_lines = 0
+
         for line_no in range(line_index, self.line_count):
             line_record = self._lines[line_no]
             self._line_to_fold.append(len(self._folded_lines))
             for fold in line_record.folds:
                 self._folded_lines.append(fold)
-                refresh_lines.append(fold_line)
+                refresh_lines += 1
 
         width = self._width
         self.virtual_size = Size(width, len(self._folded_lines))
-        self.refresh(*[Region(0, line_no, width, 1) for line_no in refresh_lines])
+        self.refresh(Region(0, line_no, width, refresh_lines))
 
     def render_line(self, y: int) -> Strip:
         scroll_x, scroll_y = self.scroll_offset
@@ -351,9 +352,9 @@ if __name__ == "__main__":
             env["FORCE_COLOR"] = "1"
 
             process = await asyncio.create_subprocess_shell(
-                # "python -m rich.progress",
+                "python -m rich.progress",
                 # "python ansi_mandel.py",
-                "python simple_test.py",
+                # "python simple_test.py",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
@@ -365,11 +366,5 @@ if __name__ == "__main__":
                 ansi_log.write(line)
             line = unicode_decoder.decode(b"", final=True)
             ansi_log.write(line)
-
-            # for repeat in range(100):
-            #     self.query_one(ANSILog).add_line(
-            #         Content.from_markup("Hello, World! " * 20)
-            #     )
-            #     self.query_one(ANSILog).add_line(Content.from_markup("FOO BAR " * 20))
 
     ANSIApp().run()

@@ -4,9 +4,10 @@ import json
 
 import platformdirs
 
+from rich import terminal_theme
+
 from textual.reactive import var, reactive
-from textual.app import App, ComposeResult
-from textual.binding import Binding
+from textual.app import App
 from textual.screen import Screen
 from textual.signal import Signal
 
@@ -92,6 +93,7 @@ class ToadApp(App):
                 json.dumps(settings, indent=4, separators=(", ", ": ")), "utf-8"
             )
             self.notify(f"Wrote default settings to {settings_path}")
+        self.ansi_theme_dark = terminal_theme.DIMMED_MONOKAI
         self._settings = settings
         self.settings.set_all()
 

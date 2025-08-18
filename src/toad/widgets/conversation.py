@@ -734,28 +734,11 @@ class Conversation(containers.Vertical):
                 title="Run",
                 severity="error",
             )
-        run_output = RunOutput()
-        await self.post(run_output, anchor=True)
+
         with open("run", mode="wt", encoding="utf-8") as source:
             source.write(code)
 
-        env = os.environ.copy()
-        env["COLUMNS"] = str(self.size.width - 4)
-        env["LINES"] = "24"
-        env["TTY_COMPATIBLE"] = "1"
-
-        process = await asyncio.create_subprocess_shell(
-            command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            env=env,
-        )
-        unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
-        decode = unicode_decoder.decode
-        assert process.stdout is not None
-        while data := await process.stdout.read(1024 * 16):
-            run_output.write(decode(data))
-        run_output.write(decode(data, final=True))
+        await self.post_shell(command)
 
     def refresh_block_cursor(self) -> None:
         if (cursor_block := self.cursor_block_child) is not None:
@@ -767,53 +750,3 @@ class Conversation(containers.Vertical):
             self.cursor.visible = False
             self.cursor.follow(None)
             self.prompt.focus()
-
-    # def watch_cursor_offset(
-    #     self, previous_block_cursor: int, block_cursor: int
-    # ) -> None:
-    #     if block_cursor == -1 and previous_block_cursor != -1:
-    #         try:
-    #             block = self.contents.children[previous_block_cursor]
-    #         except IndexError:
-    #             pass
-    #         else:
-    #             if isinstance(block, BlockProtocol):
-    #                 if block is not self.cursor_block_child:
-    #                     block.block_cursor_clear()
-
-    #     if block_cursor != -1:
-    #         try:
-    #             block = self.contents.children[block_cursor]
-    #         except IndexError:
-    #             pass
-    #         else:
-    #             if isinstance(block, BlockProtocol):
-    #                 if (
-    #                     block_cursor > previous_block_cursor
-    #                     and previous_block_cursor != -1
-    #                 ):
-    #                     block.block_cursor_down()
-    #                 else:
-    #                     block.block_cursor_up()
-
-    # if previous_block_cursor != -1:
-    #     try:
-    #         block = self.contents.children[previous_block_cursor]
-    #     except IndexError:
-    #         pass
-    #     else:
-    #         if (
-    #             hasattr(block, "block_cursor_clear")
-    #             and block is not self.cursor_block
-    #         ):
-    #             block.block_cursor_clear()
-    # if block_cursor == -1:
-    #     self.cursor.follow(None)
-    #     # self.window.anchor()
-    #     self.prompt.focus()
-    # else:
-    #     self.window.focus()
-    #     self.cursor.visible = True
-    #     if (block := self.cursor_block_child) is not None:
-    #         self.cursor.follow(block)
-    #         self.window.scroll_to_center(block)

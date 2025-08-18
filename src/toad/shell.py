@@ -9,6 +9,7 @@ import pty
 import struct
 import termios
 
+from textual.widget import Widget
 
 from toad.widgets.ansi_log import ANSILog
 
@@ -32,7 +33,14 @@ class Shell:
     async def send(self, command: str, ansi_log: ANSILog) -> None:
         self.ansi_log = ansi_log
         width = ansi_log.scrollable_content_region.width
-        height = 24
+        assert isinstance(ansi_log.parent, Widget)
+        height = (
+            ansi_log.query_ancestor("Window", Widget).scrollable_content_region.height
+            - ansi_log.parent.gutter.height
+            - ansi_log.styles.margin.height
+        )
+        if height < 24:
+            height = 24
 
         command = f"{command}\n"
 
