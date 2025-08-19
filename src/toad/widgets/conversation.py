@@ -758,5 +758,7 @@ class Conversation(containers.Vertical):
             self.call_after_refresh(self.window.scroll_to_center, cursor_block)
         else:
             self.cursor.visible = False
+            self.window.anchor(False)
+            self.window.scroll_end(duration=2 / 10)
             self.cursor.follow(None)
             self.prompt.focus()
