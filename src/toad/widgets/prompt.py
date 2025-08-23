@@ -198,11 +198,13 @@ class Prompt(containers.VerticalGroup):
             self.auto_complete.action_cursor_down()
             self.show_auto_complete(True)
         else:
-            self.show_auto_complete(False)
             self.auto_complete.clear_options()
+            self.show_auto_complete(False)
 
     def set_auto_completes(self, auto_completes: list[Option] | None) -> None:
         self.auto_completes = auto_completes.copy() if auto_completes else []
+        if self.auto_completes:
+            self.update_auto_complete_location()
 
     def show_auto_complete(self, show: bool) -> None:
         if self.auto_complete.display == show:
@@ -214,7 +216,7 @@ class Prompt(containers.VerticalGroup):
         if not show:
             self.prompt_text_area.suggestion = ""
             return
-        self.update_auto_complete_location()
+        # self.update_auto_complete_location()
         cursor_row, cursor_column = self.prompt_text_area.selection.end
         line = self.prompt_text_area.document.get_line(cursor_row)
         post_cursor = line[cursor_column:]
@@ -231,15 +233,16 @@ class Prompt(containers.VerticalGroup):
             self.show_auto_complete(False)
             return
 
+        # self.show_auto_complete(
+        #     self.prompt_text_area.cursor_at_end_of_line or not self.text
+        # )
         self.update_auto_complete_location()
-        self.show_auto_complete(
-            self.prompt_text_area.cursor_at_end_of_line or not self.text
-        )
         event.stop()
 
     def update_auto_complete_location(self):
-        cursor_offset = self.prompt_text_area.cursor_screen_offset + (-2, 1)
-        self.auto_complete.styles.offset = cursor_offset
+        if self.auto_complete.display:
+            cursor_offset = self.prompt_text_area.cursor_screen_offset + (-2, 1)
+            self.auto_complete.styles.offset = cursor_offset
 
     @on(TextArea.Changed)
     def on_text_area_changed(self, event: TextArea.Changed) -> None:

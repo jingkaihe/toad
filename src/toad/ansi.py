@@ -582,7 +582,7 @@ class ANSIStream:
     @classmethod
     @lru_cache(maxsize=1024)
     def _parse_csi(cls, csi: str) -> ANSISegment | None:
-        if (match := re.match(r"\x1b\[(\d+)([ABCDGKH])", csi)) is not None:
+        if match := re.match(r"\x1b\[(\d+)([ABCDGKH])", csi):
             match match.groups():
                 case [param, "A"]:
                     cursor_move = int(param) if param else 1
