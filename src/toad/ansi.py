@@ -578,77 +578,71 @@ class ANSIStream:
             yield from self.on_token(token)
 
     def on_token(self, token: ANSIToken) -> Iterable[ANSISegment]:
-        if isinstance(token, Separator):
-            match token.text:
-                case "\n":
-                    yield ANSISegment(delta_y=1, absolute_x=0)
-                case "\r":
-                    yield ANSISegment(absolute_x=0)
-                case "\x08":
-                    yield ANSISegment(delta_x=-1)
+        match token:
+            case Separator(text):
+                match text:
+                    case "\n":
+                        yield ANSISegment(delta_y=1, absolute_x=0)
+                    case "\r":
+                        yield ANSISegment(absolute_x=0)
+                    case "\x08":
+                        yield ANSISegment(delta_x=-1)
 
-        elif isinstance(token, OSC):
-            osc = token.text
-            osc_parameters = osc.split(";")
-            if osc_parameters:
-                osc_code = osc_parameters[0]
-                osc_parameters = osc_parameters[1:]
-                if osc_code == "8" and osc_parameters:
-                    link = osc_parameters[-1]
-                    self.style += Style(link=link or None)
-                elif osc_code == "2025" and osc_parameters:
-                    self.current_directory = osc_parameters[0]
+            case OSC(osc):
+                match osc.split(";"):
+                    case ["8", *_, link]:
+                        self.style += Style(link=link or None)
+                    case ["2025", current_directory, *_]:
+                        self.current_directory = current_directory
 
-        elif isinstance(token, CSI):
-            token_text = token.text
-            terminator = token_text[-1]
-
-            if terminator == "m":
-                sgr_style = self.parse_sgr(token.text[2:-1])
-                if sgr_style is None:
-                    self.style = NULL_STYLE
+            case CSI(csi):
+                terminator = csi[-1]
+                if terminator == "m":
+                    if (sgr_style := self.parse_sgr(csi[2:-1])) is None:
+                        self.style = NULL_STYLE
+                    else:
+                        self.style += sgr_style
+                elif (match := re.match(r"\x1b\[(\d+)([ABCDGKH])", csi)) is not None:
+                    param, move_type = match.groups()
+                    match move_type:
+                        case "A":
+                            cursor_move = int(param) if param else 1
+                            yield ANSISegment(delta_y=-cursor_move)
+                        case "B":
+                            cursor_move = int(param) if param else 1
+                            yield ANSISegment(delta_y=+cursor_move)
+                        case "C":
+                            cursor_move = int(param) if param else 1
+                            yield ANSISegment(delta_x=+cursor_move)
+                        case "D":
+                            cursor_move = int(param) if param else 1
+                            yield ANSISegment(delta_x=-cursor_move)
+                        case "K":
+                            erase_type = int(param) if param else 0
+                            match erase_type:
+                                case 0:
+                                    # Clear from cursor to end of line
+                                    yield ANSISegment(
+                                        replace=(None, -1), content=Content("")
+                                    )
+                                case 1:
+                                    # clear from cursor to beginning of line
+                                    yield ANSISegment(
+                                        replace=(0, None), content=Content("")
+                                    )
+                                case 2:
+                                    # clear entire line
+                                    yield ANSISegment(
+                                        replace=(0, -1),
+                                        content=Content(""),
+                                        absolute_x=0,
+                                    )
+            case _:
+                if self.style:
+                    content = Content.styled(token.text, self.style)
                 else:
-                    self.style += sgr_style
-            elif (match := re.match(r"\x1b\[(\d+)([ABCDGKH])", token_text)) is not None:
-                param, move_type = match.groups()
-                match move_type:
-                    case "A":
-                        cursor_move = int(param) if param else 1
-                        yield ANSISegment(delta_y=-cursor_move)
-                    case "B":
-                        cursor_move = int(param) if param else 1
-                        yield ANSISegment(delta_y=+cursor_move)
-                    case "C":
-                        cursor_move = int(param) if param else 1
-                        yield ANSISegment(delta_x=+cursor_move)
-                    case "D":
-                        cursor_move = int(param) if param else 1
-                        yield ANSISegment(delta_x=-cursor_move)
-                    case "K":
-                        erase_type = int(param) if param else 0
-                        match erase_type:
-                            case 0:
-                                # Clear from cursor to end of line
-                                yield ANSISegment(
-                                    replace=(None, -1), content=Content("")
-                                )
-                            case 1:
-                                # clear from cursor to beginning of line
-                                yield ANSISegment(
-                                    replace=(0, None), content=Content("")
-                                )
-                            case 2:
-                                # clear entire line
-                                yield ANSISegment(
-                                    replace=(0, -1), content=Content(""), absolute_x=0
-                                )
-
-        else:
-            if self.style:
-                content = Content.styled(token.text, self.style)
-            else:
-                content = Content(token.text)
-            yield ANSISegment(delta_x=len(content), content=content)
+                    content = Content(token.text)
+                yield ANSISegment(delta_x=len(content), content=content)
 
 
 if __name__ == "__main__":
