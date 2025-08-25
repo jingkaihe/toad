@@ -20,6 +20,7 @@ from textual.widgets.option_list import Option
 from textual import events
 
 
+from toad import messages
 from toad.widgets.highlighted_textarea import HighlightedTextArea
 from toad.widgets.condensed_path import CondensedPath
 from toad.widgets.path_search import PathSearch
@@ -33,6 +34,7 @@ class AutoCompleteOptions(OptionList, can_focus=False):
 
 class PromptTextArea(HighlightedTextArea):
     BINDING_GROUP_TITLE = "Prompt"
+
     BINDINGS = [
         Binding("enter", "submit", "Send", key_display="⏎", priority=True),
         Binding("ctrl+j", "newline", "New line", key_display="⇧+⏎"),
@@ -53,6 +55,7 @@ class PromptTextArea(HighlightedTextArea):
 
     def on_mount(self) -> None:
         self.highlight_cursor_line = False
+        self.hide_suggestion_on_blur = False
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "newline" and self.multi_line:
@@ -111,7 +114,7 @@ class Prompt(containers.VerticalGroup):
     slash_commands: var[list[SlashCommand]] = var(list)
     shell_mode = var(False)
     multi_line = var(False)
-    show_path_search = var(True, toggle_class="-show-path-search")
+    show_path_search = var(False, toggle_class="-show-path-search")
 
     @dataclass
     class AutoCompleteMove(Message):
@@ -206,6 +209,9 @@ class Prompt(containers.VerticalGroup):
             self.auto_complete.clear_options()
             self.show_auto_complete(False)
 
+    def watch_show_path_search(self, show: bool) -> None:
+        self.prompt_text_area.suggestion = ""
+
     def set_auto_completes(self, auto_completes: list[Option] | None) -> None:
         self.auto_completes = auto_completes.copy() if auto_completes else []
         if self.auto_completes:
@@ -226,8 +232,8 @@ class Prompt(containers.VerticalGroup):
         pre_cursor = line[:cursor_column]
         self.load_suggestions(pre_cursor, post_cursor)
 
-    def on_mount(self, event: events.Mount) -> None:
-        self.call_after_refresh(self.path_search.load_paths, Path("./"))
+    # def on_mount(self, event: events.Mount) -> None:
+    #     self.call_after_refresh(self.path_search.load_paths, Path("./"))
 
     @on(HighlightedTextArea.CursorMove)
     def on_cursor_move(self, event: HighlightedTextArea.CursorMove) -> None:
@@ -280,6 +286,31 @@ class Prompt(containers.VerticalGroup):
     @on(PromptTextArea.CancelShell)
     def on_cancel_shell(self, event: PromptTextArea.CancelShell):
         self.shell_mode = False
+
+    @on(TextArea.UserInsert)
+    async def on_text_area_user_insert(self, event: TextArea.UserInsert) -> None:
+        event.stop()
+        if event.text == "@":
+            self.show_path_search = True
+            self.path_search.load_paths(self.current_directory.path)
+
+    @on(messages.PromptSuggestion)
+    def on_prompt_suggestion(self, event: messages.PromptSuggestion) -> None:
+        event.stop()
+        self.prompt_text_area.suggestion = event.suggestion
+
+    @on(messages.Dismiss)
+    def on_dismiss(self, event: messages.Dismiss) -> None:
+        event.stop()
+        if event.widget is self.path_search:
+            self.show_path_search = False
+            self.focus()
+
+    @on(messages.InsertPath)
+    def on_insert_path(self, event: messages.InsertPath) -> None:
+        event.stop()
+        path = f'"{event.path}"' if " " in event.path else event.path
+        self.prompt_text_area.insert(path)
 
     def suggest(self, suggestion: str) -> None:
         if suggestion.startswith(self.text) and self.text != suggestion:

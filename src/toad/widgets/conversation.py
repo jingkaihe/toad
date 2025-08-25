@@ -508,6 +508,7 @@ class Conversation(containers.Vertical):
         self.throbber.set_class(busy > 0, "-busy")
 
     async def on_mount(self) -> None:
+        self.prompt.focus()
         self.prompt.slash_commands = [
             SlashCommand("/about", "About Toad"),
             SlashCommand("/help", "Open Help"),

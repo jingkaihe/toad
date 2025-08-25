@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from os import PathLike
 from operator import itemgetter
 from pathlib import Path
+import re
 from typing import Sequence
 
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual import work
 from textual import getters
 from textual import containers
@@ -18,9 +21,26 @@ from textual.widgets.option_list import Option
 
 
 from toad import directory
+from toad.messages import Dismiss, InsertPath, PromptSuggestion
 
 
 class PathSearch(containers.VerticalGroup):
+    CURSOR_BINDING_GROUP = Binding.Group(description="Move selection")
+    BINDINGS = [
+        Binding(
+            "up", "cursor_up", "Cursor up", group=CURSOR_BINDING_GROUP, priority=True
+        ),
+        Binding(
+            "down",
+            "cursor_down",
+            "Cursor down",
+            group=CURSOR_BINDING_GROUP,
+            priority=True,
+        ),
+        Binding("enter", "submit", "Insert path", priority=True),
+        Binding("escape", "dismiss", "Dismiss", priority=True),
+    ]
+
     def get_fuzzy_search(self) -> FuzzySearch:
         return FuzzySearch(case_sensitive=True)
 
@@ -43,7 +63,7 @@ class PathSearch(containers.VerticalGroup):
         if not search:
             self.option_list.set_options(
                 [
-                    Option(highlighted_path)
+                    Option(highlighted_path, highlighted_path.plain)
                     for highlighted_path in self.highlighted_paths
                 ],
             )
@@ -69,20 +89,53 @@ class PathSearch(containers.VerticalGroup):
 
         self.option_list.set_options(
             [
-                Option(highlight_offsets(path, offsets))
+                Option(highlight_offsets(path, offsets), id=path.plain)
                 for score, offsets, path in scores
             ]
         )
+        self.post_message(PromptSuggestion(""))
+
+    def action_cursor_down(self) -> None:
+        self.option_list.action_cursor_down()
+
+    def action_cursor_up(self) -> None:
+        self.option_list.action_cursor_up()
+
+    def action_dismiss(self) -> None:
+        self.post_message(Dismiss(self))
+
+    def focus(self) -> None:
+        self.input.focus()
 
     @on(Input.Changed)
     async def on_input_changed(self, event: Input.Changed):
         await self.search(event.value)
 
+    @on(OptionList.OptionHighlighted)
+    async def on_option_list_changed(self, event: OptionList.OptionHighlighted):
+        event.stop()
+        if event.option:
+            self.post_message(PromptSuggestion(event.option.id))
+
+    def action_submit(self):
+        if highlighted := self.option_list.highlighted:
+            option = self.option_list.options[highlighted]
+            if option.id:
+                self.post_message(InsertPath(option.id))
+                self.post_message(Dismiss(self))
+
     def watch_root(self, root: Path) -> None:
         pass
 
     @work(exclusive=True)
-    async def load_paths(self, root: Path) -> None:
+    async def load_paths(self, root_path: str | Path) -> None:
+        self.input.clear()
+        self.input.focus()
+        if isinstance(root_path, str):
+            root = Path(root_path)
+        else:
+            root = root_path
+
         self.loading = True
         paths = await directory.scan(root, exclude_dirs=[".*", "__*__"])
         paths.sort(key=lambda path: (len(path.parts), str(path)))
@@ -91,20 +144,24 @@ class PathSearch(containers.VerticalGroup):
         self.loading = False
 
     def highlight_path(self, path: str) -> Content:
-        content = Content.styled(path, "dim")
+        if path.startswith("."):
+            return Content.styled(path, "$foreground-muted")
+        content = Content.styled(path, "$foreground-muted")
         if "/" in path:
-            content = content.stylize("$text-success", path.rfind("/") + 1)
+            content = content.stylize("$text-success dim", path.rfind("/") + 1)
         else:
-            content = content.stylize("$text-success")
+            content = content.stylize("$text-success dim")
+        if (match := re.search(r"\.(.*$)", content.plain)) is not None:
+            content = content.stylize("not dim", match.start(1), match.end(1))
         return content
 
     def watch_paths(self, paths: list[Path]) -> None:
-        # def render_path(path: Path) -> Content:
-        #     path = path.relative_to(self.root)
-
-        #     return self.highlight_path(str(path)[1:])
-
         self.highlighted_paths = [self.highlight_path(str(path)) for path in paths]
         self.option_list.set_options(
-            [Option(highlighted_path) for highlighted_path in self.highlighted_paths],
+            [
+                Option(highlighted_path, id=highlighted_path.plain)
+                for highlighted_path in self.highlighted_paths
+            ],
         )
+        self.post_message(PromptSuggestion(""))
+        self.input.focus()

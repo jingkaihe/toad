@@ -272,6 +272,7 @@ Prompt {
     }
 
     PathSearch {
+        display: none;
         height: auto;
         Input {
             margin: 0 1;
