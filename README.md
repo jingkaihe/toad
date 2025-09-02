@@ -69,12 +69,13 @@ In no particular order:
 - [ ] Various input prompts (multiple choice)
 - [ ] ToDo lists for the agent to update.
 - [ ] Animated code updates. Something that looks like a real user working. This is purely theatre, but I expect this to make an impact.
-- [ ] Fancy input with auto-complete, and Markdown TextArea
-- [ ] Slash commands (with auto complete)
-- [ ] File selector with `@` syntax
+- [x] Fancy input with auto-complete, and Markdown TextArea
+- [x] Slash commands (with auto complete)
+- [x] File selector with `@` syntax
 - [ ] Agent selector
-- [ ] Settings manager (Backed by JSON with a editor like VSCode)
+- [x] Settings manager (Backed by JSON with a editor like VSCode)
 
 ## Thanks
 
 Thanks for being a part of this!
+
