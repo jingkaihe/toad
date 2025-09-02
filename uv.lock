@@ -820,7 +820,7 @@ wheels = [
 
 [[package]]
 name = "textual"
-version = "6.0.0"
+version = "6.1.0"
 source = { editable = "../textual" }
 dependencies = [
     { name = "markdown-it-py", extra = ["linkify", "plugins"] },
