@@ -5,6 +5,7 @@ import os
 import asyncio
 import codecs
 import fcntl
+import platform
 import pty
 import struct
 import termios
@@ -12,13 +13,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from textual.message import Message
-from textual.widget import Widget
 
 
 from toad.widgets.ansi_log import ANSILog
 
 if TYPE_CHECKING:
     from toad.widgets.conversation import Conversation
+
+IS_MACOS = platform.system() == "Darwin"
 
 
 def resize_pty(fd, cols, rows):
@@ -80,9 +82,11 @@ class Shell:
         env["TTY_COMPATIBLE"] = "1"
         env["TERM"] = "xterm-256color"
         env["COLORTERM"] = "truecolor"
-        env["TOAD"] = "1"        
-        # shell = f"{self.shell} +o interactive"
-        shell = self.shell
+        env["TOAD"] = "1"
+        if IS_MACOS:
+            shell = f"{self.shell} +o interactive"
+        else:
+            shell = self.shell
 
         process = await asyncio.create_subprocess_shell(
             shell,
@@ -109,7 +113,8 @@ class Shell:
             os.fdopen(os.dup(master), "wb", 0),
         )
         self.writer = write_transport
-        self.writer.write(b'set +x\nPS1="";\n')
+        if not IS_MACOS:
+            self.writer.write(b'set +x\nPS1="";\n')
 
         current_directory = ""
         unicode_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
