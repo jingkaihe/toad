@@ -87,7 +87,7 @@ SCHEMA: list[SchemaDict] = [
         "fields": [
             {
                 "key": "view",
-                "title": "View",
+                "title": "Display preference",
                 "default": "auto",
                 "type": "choices",
                 "choices": ["unified", "split", "auto"],

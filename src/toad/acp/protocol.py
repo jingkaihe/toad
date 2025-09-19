@@ -17,7 +17,7 @@ class FileSystemCapability(SchemaDict, total=False):
 # https://agentclientprotocol.com/protocol/schema#clientcapabilities
 class ClientCapabilities(SchemaDict, total=False):
     fs: FileSystemCapability
-    # terminal: bool
+    terminal: bool
 
 
 # https://agentclientprotocol.com/protocol/schema#promptcapabilities

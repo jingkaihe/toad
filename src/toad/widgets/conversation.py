@@ -662,7 +662,7 @@ class Conversation(containers.Vertical):
         self.notify(f"post_diff {path}")
         from toad.widgets.diff_view import DiffView
 
-        diff_view = DiffView(path, path, before, after)
+        diff_view = DiffView(path, path, before, after, classes="block")
         diff_view_setting = self.app.settings.get("diff.view", str)
         diff_view.split = diff_view_setting == "split"
         diff_view.auto_split = diff_view_setting == "auto"

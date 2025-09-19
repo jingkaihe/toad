@@ -120,6 +120,9 @@ class Question(Widget, can_focus=True):
             margin-bottom: 1;
             color: $text-primary;
         }                
+        &.-blink Option.-active #caret {
+            visibility: hidden !important;
+        }
     }
     """
 
@@ -128,6 +131,7 @@ class Question(Widget, can_focus=True):
 
     selection: reactive[int] = reactive(0, init=False)
     selected: var[bool] = var(False, toggle_class="-selected")
+    blink: var[bool] = var(False)
 
     @dataclass
     class Answer(Message):
@@ -148,6 +152,16 @@ class Question(Widget, can_focus=True):
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self.set_reactive(Question.question, question)
         self.set_reactive(Question.options, options or [])
+
+    def on_mount(self) -> None:
+        def toggle_blink() -> None:
+            self.blink = not self.blink
+
+        self._blink_timer = self.set_interval(0.5, toggle_blink)
+
+    def _reset_blink(self) -> None:
+        self.blink = False
+        self._blink_timer.reset()
 
     def update(self, ask: Ask) -> None:
         self.question = ask.question
@@ -179,13 +193,19 @@ class Question(Widget, can_focus=True):
             return False
         return True
 
+    def watch_blink(self, blink: bool) -> None:
+        self.set_class(blink, "-blink")
+
     def action_selection_up(self) -> None:
+        self._reset_blink()
         self.selection = max(0, self.selection - 1)
 
     def action_selection_down(self) -> None:
+        self._reset_blink()
         self.selection = min(len(self.options) - 1, self.selection + 1)
 
     def action_select(self) -> None:
+        self._reset_blink()
         self.post_message(
             self.Answer(
                 index=self.selected,

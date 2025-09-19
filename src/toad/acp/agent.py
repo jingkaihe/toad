@@ -79,7 +79,7 @@ class Agent(AgentBase):
 
         """
         assert self._process is not None, "Process should be present here"
-
+        print("SEND", request.body)
         if (stdin := self._process.stdin) is not None:
             stdin.write(b"%s\n" % request.body_json)
 
@@ -149,7 +149,10 @@ class Agent(AgentBase):
         # TODO: what if the read is outside of the project path?
         # https://agentclientprotocol.com/protocol/file-system#reading-files
         read_path = self.project_root_path / path
-        text = read_path.read_text(encoding="utf-8", errors="replace")
+        try:
+            text = read_path.read_text(encoding="utf-8", errors="replace")
+        except IOError:
+            text = ""
         if line is not None:
             line = max(0, line - 1)
             if limit is None:
@@ -283,9 +286,11 @@ class Agent(AgentBase):
                     "fs": {
                         "readTextFile": True,
                         "writeTextFile": True,
-                    }
+                    },
+                    "terminal": True,
                 },
             )
+            print(initialize_response)
         response = await initialize_response.wait()
         # Store agents capabilities
         if agent_capabilities := response.get("agentCapabilities"):

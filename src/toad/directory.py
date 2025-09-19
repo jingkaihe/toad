@@ -101,7 +101,7 @@ async def scan(
         await queue.join()
     except asyncio.CancelledError:
         await queue.join()
-
+    queue.shutdown(immediate=True)
     return results
 
 
