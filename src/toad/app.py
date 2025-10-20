@@ -261,7 +261,8 @@ class ToadApp(App):
     def get_default_screen(self) -> Screen:
         from toad.screens.main import MainScreen
 
-        return MainScreen().data_bind(
+        project_path = Path(self.project_dir or "./").resolve().absolute()
+        return MainScreen(project_path).data_bind(
             column=ToadApp.column,
             column_width=ToadApp.column_width,
             scrollbar=ToadApp.scrollbar,

@@ -20,7 +20,9 @@ class Flash(Static):
         text-align: center;
         display: none;
         text-wrap: nowrap;
-        text-overflow: ellipsis;        
+        text-overflow: ellipsis;     
+        overlay: screen;
+        offset-y: -1;   
 
         &.-default {
             background: $primary 10%;

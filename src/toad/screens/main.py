@@ -74,9 +74,12 @@ class MainScreen(Screen, can_focus=False):
     show_tree = reactive(False, toggle_class="-show-tree", bindings=True)
     project_path: var[Path] = var(Path("./").expanduser().absolute())
 
+    def __init__(self, project_path: Path) -> None:
+        super().__init__()
+        self.set_reactive(MainScreen.project_path, project_path)
+
     def compose(self) -> ComposeResult:
         yield Version("Toad v0.1")
-
         with containers.Center():
             yield DirectoryTree("./")
             yield Explain()

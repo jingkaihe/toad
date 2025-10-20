@@ -243,7 +243,7 @@ class Prompt(containers.VerticalGroup):
     shell_mode = var(False)
     multi_line = var(False)
     show_path_search = var(False, toggle_class="-show-path-search")
-    project_path = var(lambda: Path("~/").expanduser().absolute())
+    working_directory = var("")
     agent_info = var(Content(""))
     ask: var[Ask | None] = var(None)
     plan: var[list[Plan.Entry]]
@@ -566,7 +566,7 @@ class Prompt(containers.VerticalGroup):
 
     def compose(self) -> ComposeResult:
         yield AutoCompleteOptions()
-        yield PathSearch().data_bind(root=Prompt.project_path)
+        yield PathSearch().data_bind(root=Prompt.working_directory)
 
         with containers.HorizontalGroup(id="prompt-container"):
             yield Question()
@@ -581,7 +581,7 @@ class Prompt(containers.VerticalGroup):
 
         with containers.HorizontalGroup(id="info-container"):
             yield AgentInfo()
-            yield CondensedPath().data_bind(path=Prompt.project_path)
+            yield CondensedPath().data_bind(path=Prompt.working_directory)
             yield ModeSwitcher()
             yield ModeInfo("mode")
 

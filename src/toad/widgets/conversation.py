@@ -43,7 +43,7 @@ from toad.widgets.prompt import Prompt
 from toad.widgets.throbber import Throbber
 from toad.widgets.user_input import UserInput
 from toad.widgets.explain import Explain
-from toad.shell import Shell, CurrentWorkingDirectoryChanged
+from toad.shell import Shell, CurrentWorkingDirectoryChanged, ShellFinished
 from toad.slash_command import SlashCommand
 from toad.protocol import BlockProtocol, MenuProtocol
 from toad.menus import CONVERSATION_MENUS, MenuItem
@@ -152,11 +152,13 @@ class Conversation(containers.Vertical):
         Binding("escape", "cancel", "Cancel", tooltip="Cancel agent's turn"),
         Binding("ctrl+m", "mode_switcher", "Modes", tooltip="Open the mode switcher"),
         Binding("ctrl+comma,f2", "settings", "Settings", tooltip="Settings screen"),
+        Binding("ctrl+c", "interrupt", "Interrupt", tooltip="interrupt"),
     ]
 
     busy_count = var(0)
     cursor_offset = var(-1, init=False)
     project_path = var(Path("./").expanduser().absolute())
+    working_directory: var[str] = var("")
     _blocks: var[list[MarkdownBlock] | None] = var(None)
 
     throbber: getters.query_one[Throbber] = getters.query_one("#throbber")
@@ -165,11 +167,7 @@ class Conversation(containers.Vertical):
     cursor = getters.query_one(Cursor)
     prompt = getters.query_one(Prompt)
     app = getters.app(ToadApp)
-
-    def create_shell(self) -> Shell:
-        return Shell(self)
-
-    shell: var[Shell] = var(Initialize(create_shell))
+    _shell: var[Shell | None] = var(None)
 
     agent: var[AgentBase | None] = var(None, bindings=True)
     agent_info: var[Content] = var(Content())
@@ -180,13 +178,18 @@ class Conversation(containers.Vertical):
 
     def __init__(self, project_path: Path) -> None:
         super().__init__()
-        self.set_reactive(Conversation.project_path, project_path)
+
+        self.project_path = project_path
+        self.working_directory = str(project_path)
+        # self.set_reactive(Conversation.project_path, project_path)
+        # self.set_reactive(Conversation.working_directory, str(project_path))
         self.agent_slash_commands: list[SlashCommand] = []
         self.slash_command_hints: dict[str, str] = {}
         self.terminals: dict[str, Terminal] = {}
         self._loading: Loading | None = None
         self._agent_response: AgentResponse | None = None
         self._agent_thought: AgentThought | None = None
+        self._ansi_log: ANSILog | None = None
         self._last_escape_time: float = monotonic()
 
     def compose(self) -> ComposeResult:
@@ -198,16 +201,12 @@ class Conversation(containers.Vertical):
                 yield Contents(id="contents")
         yield Flash()
         yield Prompt().data_bind(
-            project_path=Conversation.project_path,
+            working_directory=Conversation.working_directory,
             agent_info=Conversation.agent_info,
             agent_ready=Conversation.agent_ready,
             current_mode=Conversation.current_mode,
             modes=Conversation.modes,
         )
-
-    @cached_property
-    def conversation(self) -> llm.Conversation:
-        return llm.get_model(self.app.settings.get("llm.model", str)).conversation()
 
     @on(messages.Flash)
     def on_flash(self, event: messages.Flash) -> None:
@@ -397,7 +396,15 @@ class Conversation(containers.Vertical):
     def on_current_working_directory_changed(
         self, event: CurrentWorkingDirectoryChanged
     ) -> None:
+        if self._ansi_log is not None:
+            self._ansi_log.finalize()
+        self.working_directory = str(event.path)
         self.prompt.current_directory.path = event.path
+
+    @on(ShellFinished)
+    def on_shell_finished(self) -> None:
+        if self._ansi_log is not None:
+            self._ansi_log.finalize()
 
     def watch_busy_count(self, busy: int) -> None:
         self.throbber.set_class(busy > 0, "-busy")
@@ -509,6 +516,12 @@ class Conversation(containers.Vertical):
         if terminal.released:
             return None
         return terminal
+
+    async def action_interrupt(self) -> None:
+        if self._ansi_log is not None and not self._ansi_log.is_finalized:
+            await self.shell.interrupt()
+            self._shell = None
+            self.flash("[b]Interrupted[/b]")
 
     @work
     @on(acp_messages.CreateTerminal)
@@ -727,7 +740,7 @@ class Conversation(containers.Vertical):
         self.prompt.slash_commands = self._build_slash_commands()
         self.call_after_refresh(self.post_welcome)
         self.app.settings_changed_signal.subscribe(self, self._settings_changed)
-        self.call_after_refresh(self.start_shell)
+        # self.shell.start()
 
         if self.app.acp_command:
 
@@ -742,10 +755,6 @@ class Conversation(containers.Vertical):
 
         else:
             self.agent_ready = True
-
-    @work
-    async def start_shell(self) -> None:
-        await self.shell.run()
 
     def _settings_changed(self, setting_item: tuple[str, str]) -> None:
         key, value = setting_item
@@ -843,16 +852,37 @@ class Conversation(containers.Vertical):
             self.window.anchor()
         return widget
 
-    async def get_ansi_log(self, width: int, display: bool = True) -> ANSILog:
+    async def new_ansi_log(self, width: int, display: bool = True) -> ANSILog:
+        """Create a new ANSI log.
+
+        Args:
+            width: Initial width of the ansi log.
+            display: Initial display.
+
+        Returns:
+            A new (mounted) ANSILog widget.
+        """
         from toad.widgets.ansi_log import ANSILog
 
-        if self.children and isinstance(self.children[-1], ANSILog):
-            ansi_log = self.children[-1]
-        else:
-            ansi_log = ANSILog(minimum_terminal_width=width)
-            ansi_log.display = display
-            ansi_log = await self.post(ansi_log)
+        if self._ansi_log is not None:
+            self._ansi_log.finalize()
+
+        ansi_log = ANSILog(minimum_terminal_width=width)
+        ansi_log.display = display
+        ansi_log = await self.post(ansi_log)
+        self._ansi_log = ansi_log
         return ansi_log
+
+    @property
+    def shell(self) -> Shell:
+        if self._shell is None or self._shell.is_finished:
+            shell_directory = self.working_directory
+            self._shell = Shell(self, shell_directory)
+            self._shell.start()
+        return self._shell
+
+    async def _shell_send(self, command: str, width: int, height: int) -> None:
+        await self.shell.send(command, width, height)
 
     async def post_shell(self, command: str) -> None:
         from toad.widgets.shell_result import ShellResult
@@ -1071,11 +1101,6 @@ class Conversation(containers.Vertical):
             else:
                 PROMPT = f"Explain the following:\n{block.source}"
             self.screen.query_one(Explain).send_prompt(PROMPT)
-
-    def action_run(self) -> None:
-        if (block := self.get_cursor_block(MarkdownBlock)) is not None and block.source:
-            assert isinstance(block, MarkdownFence)
-            self.execute(block._content.plain, block.lexer)
 
     @work
     async def action_settings(self) -> None:

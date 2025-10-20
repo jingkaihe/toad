@@ -14,7 +14,13 @@ from textual.strip import Strip
 from textual.selection import Selection
 from textual.filter import LineFilter
 
-from toad.ansi import ANSIStream, ANSICursorContent, ANSIClear, ANSICommand
+from toad.ansi import (
+    ANSIStream,
+    ANSICursor,
+    ANSIClear,
+    ANSICommand,
+    ANSIWorkingDirectory,
+)
 from toad.menus import MenuItem
 
 
@@ -84,12 +90,25 @@ class ANSILog(ScrollView, can_focus=False):
         self._reflow_width: int | None = None
 
         self._width = 80
+        self._finalized = False
+
+        self.current_directory = ""
+        self.current_directory_updates = 0
 
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
 
+    def finalize(self) -> None:
+        """Finalize the log.
+
+        A finalized log will reject new writes.
+        Adds the TCSS class `-finalized`.
+        """
+        self._finalized = True
+        self.add_class("-finalized")
+
     @property
-    def current_directory(self) -> str:
-        return self._ansi_stream.current_directory
+    def is_finalized(self) -> bool:
+        return self._finalized
 
     def _update_width(self) -> None:
         window_width = (
@@ -194,7 +213,7 @@ class ANSILog(ScrollView, can_focus=False):
         added_content = False
         folded_lines = self._folded_lines
         match ansi_command:
-            case ANSICursorContent(
+            case ANSICursor(
                 delta_x,
                 delta_y,
                 absolute_x,
@@ -252,6 +271,10 @@ class ANSILog(ScrollView, can_focus=False):
                     self.cursor_offset = absolute_x
                 if absolute_y is not None:
                     self.cursor_line = max(0, absolute_y)
+            case ANSIWorkingDirectory(path):
+                self.current_directory = path
+                self.current_directory_updates += 1
+
         return added_content
 
     def write(self, text: str) -> bool:
@@ -266,13 +289,14 @@ class ANSILog(ScrollView, can_focus=False):
         if not text:
             return False
 
+        if self._finalized:
+            return False
+
         added_content = False
         for ansi_command in self._ansi_stream.feed(text):
             if self._handle_ansi_command(ansi_command):
                 added_content = True
 
-        self._update_virtual_size()
-        self.screen._compositor_refresh()
         return added_content
 
     def _fold_line(self, line_no: int, line: Content, width: int) -> list[LineFold]:
@@ -318,11 +342,10 @@ class ANSILog(ScrollView, can_focus=False):
         width = self._width
         line_record = LineRecord(content, self._fold_line(line_no, content, width))
         self._lines.append(line_record)
-        # if not width:
-        #     return
         folds = line_record.folds
         self._line_to_fold.append(len(self._folded_lines))
         self._folded_lines.extend(folds)
+        self._update_virtual_size()
 
     def _add_new_lines(self, line_index: int) -> None:
         while line_index >= len(self._lines):
@@ -356,10 +379,6 @@ class ANSILog(ScrollView, can_focus=False):
                 refresh_lines += 1
 
         self.refresh(Region(0, line_index, self._width, refresh_lines))
-
-    def on_idle(self):
-        # self._update_width()
-        self._update_virtual_size()
 
     def render_line(self, y: int) -> Strip:
         scroll_x, scroll_y = self.scroll_offset

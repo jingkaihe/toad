@@ -215,14 +215,15 @@ Conversation {
         padding: 0 1 0 0;
         margin: 1 0;
         overflow: scroll;
-        scrollbar-size: 0 0;
+        scrollbar-size: 0 0;  
+        # &.-finalized {            
+        # }      
     }
 
     Terminal {
         height: auto;   
         border: panel $text-secondary 90%;          
-        padding: 1 1 0 1;        
-        # margin: 1 1 1 0;
+        padding: 1 1 0 1;                
         &.-success {
             border: panel $text-success 90%;              
         }
@@ -274,9 +275,7 @@ Welcome {
 
 Prompt {
             
-    padding: 0 0 0 0;
-    # max-height: 50%;
-    # background: $background;
+    padding: 0 0 0 0;    
     height: auto;  
     dock: bottom;  
    
