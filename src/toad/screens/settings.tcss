@@ -20,7 +20,7 @@ SettingsScreen {
         margin: 1 0 0 0;        
     }
 
-    Input,Select SelectCurrent, Checkbox {
+    Input,Select SelectCurrent, Checkbox,TextArea {
         border: tall black 20%;
         &:focus {
             border: tall $primary;
