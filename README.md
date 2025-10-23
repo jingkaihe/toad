@@ -47,7 +47,7 @@ Here's a tongue-in-check write up on my blog: https://willmcgugan.github.io/anno
 Please **do** talk about Toad!
 Generating a buzz ahead of the first open release will be very beneficial.
 
-You may share your thoughts on social media in addition to screenshots and videos (but obviously no code from this repository). please use the hashtag `#toad`.
+You may share your thoughts on social media in addition to screenshots and videos (but obviously no code from this repository). please use the hashtag `#toadai`.
 
 I intend to release a first public version when there is enough core functionality.
 Progress has been good. So I would expect a release in December.
@@ -119,6 +119,7 @@ Thanks for being a part of this!
 See you in discussions.
 
 I'm also in the #toad channel on the [Textualize discord server](https://discord.gg/Enf6Z3qhVr).
+
 
 
 
