@@ -783,26 +783,6 @@ class Conversation(containers.Vertical):
             MarkdownNote(notes_path.read_text(), name="read_text", classes="note")
         )
 
-        # from toad.widgets.agent_response import AgentResponse
-
-        # agent_response = AgentResponse(self.conversation)
-        # await self.post(agent_response)
-        # agent_response.update(MD)
-
-        # from toad.widgets.question import Ask
-
-        # OPTIONS = [
-        #     ("Yes, allow once", "proceed_always"),
-        #     ("Yes, allow always", "allow_always"),
-        #     ("Modify with external editor", "modify"),
-        #     ("No, suggest changes (esc)", "reject"),
-        # ]
-
-        # self.prompt.ask = Ask(
-        #     "What would you like to do?",
-        #     OPTIONS,
-        # )
-
     def watch_agent(self, agent: AgentBase | None) -> None:
         if agent is None:
             self.agent_info = Content.styled("shell")

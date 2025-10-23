@@ -13,3 +13,4 @@ wheels/
 .zed
 
 agent.jsonl
+replay.jsonl
