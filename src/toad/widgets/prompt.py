@@ -190,11 +190,13 @@ class PromptTextArea(HighlightedTextArea):
             if " " not in self.text:
                 self.insert(self.suggestion + " ")
             else:
+                prompt = self.query_ancestor(Prompt)
                 last_token = shlex.split(self.text + self.suggestion)[-1]
-                if Path(last_token).is_dir():
-                    self.insert(self.suggestion + " ")
-                else:
+                last_token_path = Path(prompt.working_directory) / last_token
+                if last_token_path.is_dir():
                     self.insert(self.suggestion)
+                else:
+                    self.insert(self.suggestion + " ")
                 self.suggestion = ""
             return
         self.post_message(UserInputSubmitted(self.text, self.shell_mode))
@@ -241,6 +243,9 @@ class PromptTextArea(HighlightedTextArea):
 
         prompt = self.query_ancestor(Prompt)
 
+        if not self.cursor_at_end_of_text:
+            return
+
         _cursor_row, cursor_column = prompt.prompt_text_area.selection.end
         pre_complete = self.text[:cursor_column]
         post_complete = self.text[cursor_column:]
@@ -255,7 +260,7 @@ class PromptTextArea(HighlightedTextArea):
 
         if tab_complete is not None:
             shlex_tokens = shlex_tokens[:-1] + [shlex_tokens[-1] + tab_complete]
-            path_component = Path(shlex_tokens[-1])
+            path_component = Path(prompt.working_directory) / shlex_tokens[-1]
             if path_component.is_file():
                 spaces = " "
             else:
