@@ -378,10 +378,10 @@ class Agent(AgentBase):
 
         async def call_jsonrpc(request: jsonrpc.JSONObject | jsonrpc.JSONList) -> None:
             try:
-                result = await self.server.call(request)
-                result_json = json.dumps(result).encode("utf-8")
-                if process.stdin is not None:
-                    process.stdin.write(b"%s\n" % result_json)
+                if (result := await self.server.call(request)) is not None:
+                    result_json = json.dumps(result).encode("utf-8")
+                    if process.stdin is not None:
+                        process.stdin.write(b"%s\n" % result_json)
             finally:
                 if (task := asyncio.current_task()) is not None:
                     tasks.discard(task)

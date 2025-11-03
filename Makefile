@@ -21,3 +21,7 @@ codex-acp:
 .PHONY: replay
 replay:
 	ACP_INITIALIZE=0 $(run) acp "$(run) replay $(realpath replay.jsonl)" --project-dir ~/sandbox
+
+.PHONY: echo
+echo:
+	$(run) acp "uv run echo_client.py"
