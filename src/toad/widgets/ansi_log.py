@@ -393,7 +393,7 @@ class ANSILog(ScrollView, can_focus=False):
             return Strip.blank(width, rich_style)
 
         unfolded_line = self._lines[line_no]
-        cache_key = (self.scroll_offset.y - y, unfolded_line.updates)
+        cache_key = (y, unfolded_line.updates)
         if not selection:
             cached_strip = self._render_line_cache.get(cache_key)
             if cached_strip is not None:

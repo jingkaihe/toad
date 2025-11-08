@@ -15,7 +15,7 @@ from time import monotonic
 
 from textual.message import Message
 
-
+from toad.shell_read import shell_read
 from toad.widgets.ansi_log import ANSILog
 
 if TYPE_CHECKING:
@@ -136,7 +136,11 @@ class Shell:
                 start_new_session=True,  # Linux / macOS only
             )
         except Exception as error:
-            self.conversation.notify(f"Unable to start shell: {error}\n\nCheck your settings.", title="Shell", severity="error")
+            self.conversation.notify(
+                f"Unable to start shell: {error}\n\nCheck your settings.",
+                title="Shell",
+                severity="error",
+            )
             return
 
         os.close(slave)
@@ -168,21 +172,7 @@ class Shell:
         self._ready_event.set()
         try:
             while True:
-                data = await reader.read(BUFFER_SIZE)
-                if data:
-                    buffer_time = monotonic() + self.max_buffer_duration
-                    # Accumulate data for a short period of time, or until we have enough data
-                    # This can reduce the number of refreshes we need to do
-                    # Resulting in faster updates and less flicker.
-                    try:
-                        while (
-                            len(data) < BUFFER_SIZE
-                            and (time := monotonic()) < buffer_time
-                        ):
-                            async with asyncio.timeout(buffer_time - time):
-                                data += await reader.read(BUFFER_SIZE)
-                    except asyncio.TimeoutError:
-                        pass
+                data = await shell_read(reader, BUFFER_SIZE, self.max_buffer_duration)
 
                 if line := unicode_decoder.decode(data, final=not data):
                     if self.ansi_log is None or self.ansi_log.is_finalized:
