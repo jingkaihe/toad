@@ -533,16 +533,22 @@ class ANSICursor(NamedTuple):
 
 @rich.repr.auto
 class ANSIClear(NamedTuple):
+    """Enumare for clearing the 'screen'."""
+
     clear: ClearType
 
 
 @rich.repr.auto
 class ANSICursorShow(NamedTuple):
+    """Toggle visibility of the cursor."""
+
     show: bool
 
 
 @rich.repr.auto
 class ANSIAlternateBuffer(NamedTuple):
+    """Toggle the alternate buffer."""
+
     enable: bool
 
 
@@ -605,7 +611,16 @@ class ANSIStream:
 
         return style
 
-    def feed(self, text: str) -> Iterable[ANSICursor]:
+    def feed(self, text: str) -> Iterable[ANSICommand]:
+        """Feed text potentially containing ANSI sequences, and parse in to
+        an iterable of ansi commands.
+
+        Args:
+            text: Text to feed.
+
+        Yields:
+            `ANSICommand` isntances.
+        """
         for token in self.parser.feed(text):
             if isinstance(token, ANSIToken):
                 yield from self.on_token(token)
@@ -679,16 +694,15 @@ class ANSIStream:
                 case _:
                     print("!!", repr(csi), repr(match.groups()))
         elif match := re.fullmatch(r"\x1b\[([0-9:;<=>?]*)([!-/]*)([@-~])", csi):
-            print(repr(match.groups(default="")))
             match match.groups(default=""):
-                case ["?25", "", "h" | "l" as show]:
-                    return cls.SHOW_CURSOR if show == "h" else cls.HIDE_CURSOR
-                case ["?1049", "", "h" | "l" as enable]:
-                    return (
-                        cls.ENABLE_ALTERNATE_BUFFER
-                        if enable
-                        else cls.DISABLE_ALTERNATE_BUFFER
-                    )
+                case ["?25", "", "h"]:
+                    return cls.SHOW_CURSOR
+                case ["?25", "", "l"]:
+                    return cls.HIDE_CURSOR
+                case ["?1049", "", "h"]:
+                    return cls.ENABLE_ALTERNATE_BUFFER
+                case ["?1049", "", "l"]:
+                    return cls.DISABLE_ALTERNATE_BUFFER
 
         return None
 
