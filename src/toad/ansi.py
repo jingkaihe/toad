@@ -995,8 +995,8 @@ class ANSIStream:
                     return cls.CLEAR_LINE
                 case [top, bottom, "r"]:
                     return ANSIScrollMargin(
-                        int(top or "1") - 1,
-                        int(bottom or "1") - 1,
+                        int(top or "1") - 1 if top else None,
+                        int(bottom or "1") - 1 if top else None,
                     )
                 case ["4", _, "h" | "l" as replace_mode]:
                     return (
@@ -1172,6 +1172,12 @@ class ScrollMargin(NamedTuple):
     def __rich_repr__(self) -> rich.repr.Result:
         yield self.top
         yield self.bottom
+
+    def get_line_range(self, height: int) -> tuple[int, int]:
+        return (
+            self.top or 0,
+            height - 1 if self.bottom is None else self.bottom,
+        )
 
 
 @dataclass
@@ -1767,22 +1773,23 @@ class TerminalState:
 
         buffer = self.buffer
 
-        line_count = len(buffer.lines)
         print(buffer.scroll_margin)
-        margin_top, margin_bottom = buffer.scroll_margin
 
-        margin_top = buffer.scroll_margin.top or 0
-        margin_bottom = buffer.scroll_margin.bottom or self.height
+        margin_top, margin_bottom = buffer.scroll_margin.get_line_range(self.height)
+        print(margin_top, margin_bottom)
+
+        # margin_top = buffer.scroll_margin.top or 0
+        # margin_bottom = buffer.scroll_margin.bottom or self.height
 
         line_start = margin_top
-        line_end = margin_bottom
+        line_end = margin_bottom + 1
 
         print(line_start, line_end)
 
         if direction == -1:
             # up (first in test)
             print("UP")
-            for line_no in range(line_start, line_end + 1):
+            for line_no in range(line_start, line_end):
                 copy_line_no = line_no + lines
                 if copy_line_no > margin_bottom:
                     copy_line = EMPTY_LINE
@@ -1796,7 +1803,7 @@ class TerminalState:
         else:
             # down
             print("DOWN")
-            for line_no in reversed(range(line_start, line_end + 1)):
+            for line_no in reversed(range(line_start, line_end)):
                 print(line_no)
                 copy_line_no = line_no - lines
                 if copy_line_no < margin_top:
@@ -1836,16 +1843,18 @@ class TerminalState:
                     while buffer.cursor_line >= len(folded_lines):
                         self.add_line(buffer, EMPTY_LINE)
 
-                if auto_scroll:
+                if auto_scroll and delta_y is not None:
+                    start_line_no = self.screen_start_line_no
+                    scroll_cursor = buffer.cursor_line + delta_y
                     if delta_y == +1 and (
-                        buffer.cursor_line + 1
-                        >= self.screen_start_line_no + buffer.scroll_margin.bottom
+                        scroll_cursor
+                        >= (start_line_no + (buffer.scroll_margin.bottom or 0))
                     ):
                         self.scroll_buffer(-1, 1)
                         return
                     elif delta_y == -1 and (
-                        buffer.cursor_line - 1
-                        <= self.screen_start_line_no + buffer.scroll_margin.top
+                        scroll_cursor
+                        <= (start_line_no + (buffer.scroll_margin.top or 0))
                     ):
                         self.scroll_buffer(+1, 1)
                         return
