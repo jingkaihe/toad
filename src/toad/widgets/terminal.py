@@ -97,7 +97,7 @@ class Terminal(ScrollView, can_focus=True):
         self._width = width
 
         self._terminal_render_cache.clear()
-        # self.refresh()
+        self.refresh()
 
     def on_mount(self) -> None:
         self.auto_links = False
@@ -115,8 +115,8 @@ class Terminal(ScrollView, can_focus=True):
         with timer(f"write {len(text)} characters"):
             scrollback_delta, alternate_delta = self.state.write(text)
         with timer("Update widget"):
-            self._update_from_state(None, None)
-            # self._update_from_state(scrollback_delta, alternate_delta)
+            # self._update_from_state(None, None)
+            self._update_from_state(scrollback_delta, alternate_delta)
 
     def _update_from_state(
         self, scrollback_delta: set[int] | None, alternate_delta: set[int] | None
@@ -124,9 +124,9 @@ class Terminal(ScrollView, can_focus=True):
         if self.state.is_finalized:
             self.add_class("-finalized")
         width = self.state.width
-        height = self.state.scrollback_buffer.line_count
+        height = self.state.scrollback_buffer.height
         if self.state.alternate_screen:
-            height += self.state.alternate_buffer.line_count
+            height += self.state.alternate_buffer.height
         self.virtual_size = Size(min(self.state.buffer.max_line_width, width), height)
         if self._anchored and not self._anchor_released:
             self.scroll_y = self.max_scroll_y
@@ -200,10 +200,11 @@ class Terminal(ScrollView, can_focus=True):
         line_record = buffer.lines[line_no]
         cache_key: tuple | None = (
             self.state.alternate_screen,
+            y,
             line_record.updates,
             updates,
         )
-        cache_key = None  # REMOVE
+        # cache_key = None  # REMOVE
 
         if (
             not self.hide_cursor

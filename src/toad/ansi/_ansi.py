@@ -741,6 +741,11 @@ class Buffer:
         return len(self.lines)
 
     @property
+    def height(self) -> int:
+        """Height of the buffer (number of folded lines)."""
+        return len(self.folded_lines)
+
+    @property
     def last_line_no(self) -> int:
         """Index of last lines."""
         return len(self.lines) - 1
@@ -991,21 +996,12 @@ class TerminalState:
         buffer.line_to_fold.clear()
         width = self.width
 
-        from textual import log
-
-        for offset, line in enumerate(buffer.lines):
-            print(offset, repr(line.content.plain))
-
-        original_lines = buffer.lines.copy()
-
         for line_no, line_record in enumerate(buffer.lines):
             line_expanded_tabs = line_record.content.expand_tabs(8)
             line_record.folds[:] = self._fold_line(line_no, line_expanded_tabs, width)
             line_record.updates = self.advance_updates()
             buffer.line_to_fold.append(len(buffer.folded_lines))
             buffer.folded_lines.extend(line_record.folds)
-
-        assert buffer.lines == original_lines
 
         # After reflow, we need to work out where the cursor is within the folded lines
         # cursor_line = min(cursor_line, len(buffer.lines) - 1)
@@ -1356,21 +1352,15 @@ class TerminalState:
         updates = self._updates
         if not self.auto_wrap:
             return [LineFold(line_no, 0, 0, line, updates)]
-        # updates = self.advance_updates()
         if not width:
             return [LineFold(0, 0, 0, line, updates)]
         line_length = line.cell_length
         if line_length <= width:
             return [LineFold(line_no, 0, 0, line, updates)]
-        # divide_offsets = list(range(width, line_length, width))
-        # folded_lines = [folded_line for folded_line in line.divide(divide_offsets)]
 
         folded_lines = self._wrap_content(line, width)
-        offsets = [0, *accumulate(len(line) for line in folded_lines)]
+        offsets = [0, *accumulate(len(line) for line in folded_lines)][:-1]
 
-        print(folded_lines, offsets)
-
-        # offsets = [0, *divide_offsets]
         folds = [
             LineFold(line_no, line_offset, offset, folded_line, updates)
             for line_offset, (offset, folded_line) in enumerate(
