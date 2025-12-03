@@ -1269,7 +1269,7 @@ class TerminalState:
 
                     if cursor_line_offset > len(line.content):
                         line.content = self._expand_content(
-                            line.content, cursor_line_offset, self.style
+                            line.content, cursor_line_offset, NULL_STYLE
                         )
 
                     if replace is not None:
@@ -1309,11 +1309,7 @@ class TerminalState:
                                 line.content[cursor_line_offset + len(content) :],
                                 strip_control_codes=False,
                             )
-                            if len(updated_line) > self.width:
-                                print("---", self.width)
-                                repr(content)
-                                print(repr(line.content.plain))
-                                print(repr(updated_line.plain))
+
                         else:
                             updated_line = Content.assemble(
                                 line.content[:cursor_line_offset],
