@@ -15,6 +15,7 @@ from rich.cells import cell_len
 from textual import events
 from textual.color import Color
 from textual.content import Content, EMPTY_CONTENT
+from textual.geometry import clamp
 from textual.style import Style, NULL_STYLE
 
 from toad.ansi._ansi_colors import ANSI_COLORS
@@ -207,6 +208,7 @@ class ANSICursor(NamedTuple):
         yield "text", self.text, None
         yield "erase", self.erase, False
         yield "replace", self.replace, None
+        yield "relative", self.relative, False
         yield "update_background", self.update_background, False
         yield "auto_scroll", self.auto_scroll, False
 
@@ -214,6 +216,15 @@ class ANSICursor(NamedTuple):
     def get_replace_offsets(
         self, cursor_offset: int, line_length: int
     ) -> tuple[int, int]:
+        """Get replace offsets.
+
+        Args:
+            cursor_offset: Current cursor offset.
+            line_length: Length of line.
+
+        Returns:
+            A pair of offsets (inclusive).
+        """
         assert self.replace is not None, (
             "Only call this if the replace attribute has a value"
         )
@@ -226,6 +237,8 @@ class ANSICursor(NamedTuple):
             replace_start = line_length + replace_start
         if replace_end < 0:
             replace_end = line_length + replace_end
+        else:
+            replace_end -= 1
         if self.relative:
             return (cursor_offset + replace_start, cursor_offset + replace_end)
         else:
@@ -458,22 +471,32 @@ class ANSIStream:
         """
 
         if match := re.fullmatch(r"\[(\d+)?(?:;)?(\d*)?(\w)", csi):
-            match match.groups(default=""):
+            match_groups = match.groups(default="")
+            match match_groups:
                 case [lines, _, "A"]:
+                    # CUU - Cursor Up: ESC[nA
                     return ANSICursor(delta_y=-int(lines or 1))
                 case [lines, _, "B"]:
+                    # CUD - Cursor Down: ESC[nB
                     return ANSICursor(delta_y=+int(lines or 1))
                 case [cells, _, "C"]:
+                    # CUF - Cursor Forward: ESC[nC
                     return ANSICursor(delta_x=+int(cells or 1))
                 case [cells, _, "D"]:
+                    # CUB - Cursor Back: ESC[nD
                     return ANSICursor(delta_x=-int(cells or 1))
                 case [lines, _, "E"]:
+                    # CNL - Cursor Next Line: ESC[nE
                     return ANSICursor(absolute_x=0, delta_y=+int(lines or 1))
                 case [lines, _, "F"]:
+                    # CPL - Cursor Previous Line: ESC[nF
                     return ANSICursor(absolute_x=0, delta_y=-int(lines or 1))
                 case [cells, _, "G"]:
+                    # CHA - Cursor Horizontal Absolute: ESC[nG
                     return ANSICursor(absolute_x=+int(cells or 1) - 1)
-                case [row, column, "H"]:
+                case [row, column, "H" | "f"]:
+                    # CUP - Cursor Position: ESC[n;mH
+                    # HVP - Horizontal Vertical Position: ESC[n;mf
                     return ANSICursor(
                         absolute_x=int(column or 1) - 1,
                         absolute_y=int(row or 1) - 1,
@@ -487,6 +510,7 @@ class ANSIStream:
                 case [lines, _, "T"]:
                     return ANSIScroll(+1, int(lines))
                 case [row, _, "d"]:
+                    # VPA - Vertical Position Absolute: ESC[nd
                     return ANSICursor(absolute_y=int(row or 1) - 1)
                 case [characters, _, "X"]:
                     return ANSICursor(
@@ -1166,9 +1190,23 @@ class TerminalState:
                         copy_style = copy_line.style
                 self.update_line(buffer, line_no, copy_content, copy_style)
 
-    def _handle_ansi_command(self, ansi_command: ANSICommand) -> None:
-        # print(repr(ansi_command))
+    @classmethod
+    def _expand_content(cls, content: Content, offset: int, style: Style) -> Content:
+        """Expand content to be at least as long as a given offset.
 
+        Args:
+            content: Content to expand.
+            offset: Offset within the content.
+            style: Style of padding.
+
+        Returns:
+            New Content.
+        """
+        if offset > len(content):
+            content += Content.styled(" " * (offset - len(content)), style)
+        return content
+
+    def _handle_ansi_command(self, ansi_command: ANSICommand) -> None:
         if isinstance(ansi_command, ANSINewLine):
             if self.alternate_screen:
                 # New line behaves differently in alternate screen
@@ -1230,8 +1268,8 @@ class TerminalState:
                     cursor_line_offset = self.get_cursor_line_offset(buffer)
 
                     if cursor_line_offset > len(line.content):
-                        line.content = line.content.pad_right(
-                            cursor_line_offset - len(line.content)
+                        line.content = self._expand_content(
+                            line.content, cursor_line_offset, self.style
                         )
 
                     if replace is not None:
@@ -1254,7 +1292,8 @@ class TerminalState:
                             line.content[:start_replace],
                             (
                                 Content.styled(
-                                    " " * (end_replace - start_replace), self.style
+                                    " " * ((end_replace - start_replace) + 1),
+                                    self.style,
                                 )
                                 if erase
                                 else content
@@ -1263,9 +1302,6 @@ class TerminalState:
                             strip_control_codes=False,
                         )
                     else:
-                        # if cursor_line_offset == len(line.content):
-                        #     updated_line = line.content + content
-                        # else:
                         if self.replace_mode:
                             updated_line = Content.assemble(
                                 line.content[:cursor_line_offset],
@@ -1273,6 +1309,11 @@ class TerminalState:
                                 line.content[cursor_line_offset + len(content) :],
                                 strip_control_codes=False,
                             )
+                            if len(updated_line) > self.width:
+                                print("---", self.width)
+                                repr(content)
+                                print(repr(line.content.plain))
+                                print(repr(updated_line.plain))
                         else:
                             updated_line = Content.assemble(
                                 line.content[:cursor_line_offset],
@@ -1282,18 +1323,26 @@ class TerminalState:
                             )
 
                     self.update_line(
-                        buffer, folded_line.line_no, updated_line, line.style
+                        buffer,
+                        folded_line.line_no,
+                        updated_line[: self.width],
+                        line.style,
                     )
                     if not previous_content.is_same(folded_line.content):
                         buffer.updates = self.advance_updates()
 
                 if delta_x is not None:
                     buffer.update_line(buffer.cursor_line)
-                    buffer.move_cursor_horizontal(delta_x)
+                    if text:
+                        buffer.move_cursor_horizontal(delta_x)
+                    else:
+                        buffer.cursor_offset = clamp(
+                            buffer.cursor_offset + delta_x, 0, self.width - 1
+                        )
                     buffer.update_line(buffer.cursor_line)
 
                 if absolute_x is not None:
-                    buffer.cursor_offset = absolute_x
+                    buffer.cursor_offset = clamp(absolute_x, 0, self.width - 1)
                     buffer.update_line(buffer.cursor_line)
 
                 current_cursor_line = buffer.cursor_line
@@ -1331,7 +1380,6 @@ class TerminalState:
                 self.clear_buffer(clear)
 
             case ANSIScrollMargin(top, bottom):
-                print(ansi_command)
                 self.buffer.scroll_margin = ScrollMargin(top, bottom)
                 # Setting the scroll margins moves the cursor to (1, 1)
                 buffer = self.buffer
@@ -1341,7 +1389,6 @@ class TerminalState:
                 self._line_updated(buffer, buffer.cursor_line)
 
             case ANSIScroll(direction, lines):
-                print(ansi_command)
                 self.scroll_buffer(direction, lines)
 
             case ANSICharacterSet(dec, dec_invoke):
