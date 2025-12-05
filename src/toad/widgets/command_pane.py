@@ -49,11 +49,9 @@ class CommandPane(Terminal):
     class CommandComplete(Message):
         return_code: int
 
-    def execute(self, command: str) -> None:
-        def start_execute_task() -> None:
-            self._execute_task = asyncio.create_task(self._execute(command))
-
-        self.call_after_refresh(start_execute_task)
+    def execute(self, command: str) -> asyncio.Task:
+        self._execute_task = asyncio.create_task(self._execute(command))
+        return self._execute_task
 
     def on_resize(self, event: events.Resize):
         event.prevent_default()
@@ -83,6 +81,8 @@ class CommandPane(Terminal):
 
     async def _execute(self, command: str) -> None:
         # width, height = self.scrollable_content_region.size
+
+        await self.wait_for_refresh()
 
         master, slave = pty.openpty()
         self._master = master

@@ -13,7 +13,7 @@ publisher_url = "https://willmcgugan.github.io/"
 type = "coding"
 description = "The open platform for cloud coding agents"
 tags = []
-run_command."*" = "echo TODO"
+run_command."*" = "openhands-acp"
 recommended = true
 
 help = '''
@@ -23,13 +23,13 @@ The open platform for cloud coding agents
 
 Scale from one to thousands of agents -- open source, model agnostic, and enterprise-ready.
 
---- 
+[openhands-dev](https://openhands.dev/)
 
-TODO
+--- 
 
 '''
 
 [actions."*".install]
-command = "echo TODO"
-description = "Install OpenHands + ACP adapter"
-
+command = "uv tool install openhands --python 3.12"
+bootstral_uv = true
+description = "Install OpenHands"

@@ -107,13 +107,20 @@ class AgentModal(ModalScreen):
         from toad.screens.action_modal import ActionModal
 
         title = command["description"]
-        command = command["command"]
+        action_command = command["command"]
+        bootstrap_uv = command.get("bootstrap_uv", False)
 
         agent = self._agent
         # Focus the select
         # It's unlikely the user wants to re-run the action
         self.action_select.focus()
-        return_code = await self.app.push_screen_wait(ActionModal(title, command))
+        return_code = await self.app.push_screen_wait(
+            ActionModal(
+                title,
+                action_command,
+                bootstrap_uv=bootstrap_uv,
+            )
+        )
         if return_code == 0 and action in {"install", "install-acp"}:
             # Add to launcher if we installed something
             if not self.launcher_checkbox.value:

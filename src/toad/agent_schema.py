@@ -19,6 +19,8 @@ class Command(TypedDict):
     """Describes what the script will do. For example: 'Install Claude Code'."""
     command: str
     """Command to run."""
+    bootstrap_uv: NotRequired[bool]
+    """Bootstrap UV installer (set to `true` if the command users `uv`)."""
 
 
 class Agent(TypedDict):
