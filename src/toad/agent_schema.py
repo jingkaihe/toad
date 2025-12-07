@@ -1,7 +1,7 @@
 from typing import TypedDict, Literal, NotRequired
 
 type Tag = str
-"""A tag used for categorizing the agent. For example: 'open-source', 'reasoning' """
+"""A tag used for categorizing the agent. For example: 'open-source', 'reasoning'."""
 type OS = Literal["macos", "linux", "windows", "*"]
 """An operating system identifier, or a '*" wildcard, if it is the same for all OSes."""
 type Action = str
@@ -53,7 +53,7 @@ class Agent(TypedDict):
     author_url: str
     """The authors homepage. For example 'https://www.anthropic.com/'."""
     publisher_name: str
-    """The publisher's name (an individual or organization that wrote this data)."""
+    """The publisher's name (individual or organization that wrote this data)."""
     publisher_url: str
     """The publisher's url."""
     description: str
@@ -63,7 +63,7 @@ class Agent(TypedDict):
     help: str
     """A Markdown document with additional details regarding the agent."""
     welcome: NotRequired[str]
-    """A Markdown document shown to the user when the conversation starts."""
+    """A Markdown document shown to the user when the conversation starts. Should contain a welcome message and any advice on getting started."""
     run_command: dict[OS, str]
     """Command to run the agent, by OS or wildcard."""
     actions: dict[OS, dict[Action, Command]]
