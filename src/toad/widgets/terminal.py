@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from time import monotonic
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
 
 from textual.cache import LRUCache
 
@@ -91,7 +91,7 @@ class Terminal(ScrollView, can_focus=True):
         self._alternate_screen: bool = False
 
         self._terminal_render_cache: LRUCache[tuple, Strip] = LRUCache(1024)
-        self._write_to_stdin: Callable[[str], Any] | None = None
+        self._write_to_stdin: Callable[[str], Awaitable] | None = None
 
     @property
     def is_finalized(self) -> bool:
@@ -120,7 +120,7 @@ class Terminal(ScrollView, can_focus=True):
         """
         self.state = state
 
-    def set_write_to_stdin(self, write_to_stdin: Callable[[str], Any]) -> None:
+    def set_write_to_stdin(self, write_to_stdin: Callable[[str], Awaitable]) -> None:
         """Set a callable which is invoked with input, to be sent to stdin.
 
         Args:
@@ -203,7 +203,7 @@ class Terminal(ScrollView, can_focus=True):
             width, height = self._get_terminal_dimensions()
         self.update_size(width, height)
 
-    def write(self, text: str) -> bool:
+    async def write(self, text: str) -> bool:
         """Write sequences to the terminal.
 
         Args:
@@ -213,7 +213,7 @@ class Terminal(ScrollView, can_focus=True):
             `True` if the state visuals changed, `False` if no visual change.
         """
 
-        scrollback_delta, alternate_delta = self.state.write(text)
+        scrollback_delta, alternate_delta = await self.state.write(text)
         self._update_from_state(scrollback_delta, alternate_delta)
         scrollback_changed = bool(scrollback_delta is None or scrollback_delta)
         alternate_changed = bool(alternate_delta is None or alternate_delta)
@@ -380,12 +380,12 @@ class Terminal(ScrollView, can_focus=True):
 
         return strip
 
-    def _reset_escaping(self) -> None:
+    async def _reset_escaping(self) -> None:
         if self._escaping:
-            self.write_process_stdin(self.state.key_escape())
+            await self.write_process_stdin(self.state.key_escape())
         self._escaping = False
 
-    def on_key(self, event: events.Key):
+    async def on_key(self, event: events.Key):
         event.prevent_default()
         event.stop()
 
@@ -396,7 +396,7 @@ class Terminal(ScrollView, can_focus=True):
                     self._escaping = False
                     return
                 else:
-                    self.write_process_stdin(self.state.key_escape())
+                    await self.write_process_stdin(self.state.key_escape())
             else:
                 self._escaping = True
                 self._escape_time = monotonic()
@@ -405,12 +405,12 @@ class Terminal(ScrollView, can_focus=True):
                 )
                 return
         else:
-            self._reset_escaping()
+            await self._reset_escaping()
             if self._escape_reset_timer is not None:
                 self._escape_reset_timer.stop()
 
         if (stdin := self.state.key_event_to_stdin(event)) is not None:
-            self.write_process_stdin(stdin)
+            await self.write_process_stdin(stdin)
 
     @property
     def allow_select(self) -> bool:
@@ -444,7 +444,7 @@ class Terminal(ScrollView, can_focus=True):
         return mouse_stdin
 
     @on(events.MouseMove)
-    def on_mouse_move(self, event: events.MouseMove) -> None:
+    async def on_mouse_move(self, event: events.MouseMove) -> None:
         if self.is_finalized:
             return
         if (mouse_tracking := self.state.mouse_tracking) is None:
@@ -452,36 +452,36 @@ class Terminal(ScrollView, can_focus=True):
         if mouse_tracking.tracking == "all" or (
             event.button and mouse_tracking.tracking == "drag"
         ):
-            self._handle_mouse_event(event)
+            await self._handle_mouse_event(event)
             event.prevent_default()
             event.stop()
 
     @on(events.MouseDown)
     @on(events.MouseUp)
-    def on_mouse_button(self, event: events.MouseUp | events.MouseDown) -> None:
+    async def on_mouse_button(self, event: events.MouseUp | events.MouseDown) -> None:
         if self.is_finalized:
             return
         if self.state.mouse_tracking is None:
             return
-        self._handle_mouse_event(event)
+        await self._handle_mouse_event(event)
         event.prevent_default()
         event.stop()
 
-    def _handle_mouse_event(self, event: events.MouseEvent) -> None:
+    async def _handle_mouse_event(self, event: events.MouseEvent) -> None:
         if (mouse_tracking := self.state.mouse_tracking) is None:
             return
         # TODO: Other mouse tracking formats
         match mouse_tracking.format:
             case "sgr":
-                self.write_process_stdin(self._encode_mouse_event_sgr(event))
+                await self.write_process_stdin(self._encode_mouse_event_sgr(event))
 
-    def on_paste(self, event: events.Paste) -> None:
+    async def on_paste(self, event: events.Paste) -> None:
         for character in event.text:
-            self.write_process_stdin(character)
+            await self.write_process_stdin(character)
 
-    def write_process_stdin(self, input: str) -> None:
+    async def write_process_stdin(self, input: str) -> None:
         if self._write_to_stdin is not None:
-            self._write_to_stdin(input)
+            await self._write_to_stdin(input)
 
 
 if __name__ == "__main__":

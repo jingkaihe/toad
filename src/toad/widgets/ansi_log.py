@@ -204,7 +204,7 @@ class ANSILog(ScrollView, can_focus=False):
     def _handle_ansi_command(self, ansi_command: ANSICommand) -> bool:
         added_content = False
         folded_lines = self._folded_lines
-        print(ansi_command)
+
         match ansi_command:
             case ANSICursor(
                 delta_x,
