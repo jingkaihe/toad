@@ -188,7 +188,7 @@ ActionModal {
     #container {
         margin: 3 6;    
         height: 1fr;
-        max-height: 24;
+        max-height: 48;
         CommandPane {    
             padding: 1 1;
             background: black 10%;          
