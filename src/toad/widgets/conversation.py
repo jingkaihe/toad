@@ -1086,6 +1086,8 @@ class Conversation(containers.Vertical):
 
         if self._terminal is not None:
             self._terminal.finalize()
+            if self._terminal.state.buffer.is_blank:
+                await self._terminal.remove()
         terminal_width, terminal_height = self.get_terminal_dimensions()
         terminal = ShellTerminal(
             size=(terminal_width, terminal_height),

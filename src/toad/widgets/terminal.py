@@ -112,6 +112,10 @@ class Terminal(ScrollView, can_focus=True):
     def size(self) -> Size:
         return Size(self.width, self.height)
 
+    @property
+    def alternate_screen(self) -> bool:
+        return self._alternate_screen
+
     def set_state(self, state: ansi.TerminalState) -> None:
         """Set the terminal state, if this terminal is to inherit an existing state.
 

@@ -182,14 +182,14 @@ class Shell:
 
         while True:
             data = await shell_read(reader, BUFFER_SIZE)
-            
-            for string_bytes in list(self._hide_echo):                
+
+            for string_bytes in list(self._hide_echo):
                 remove_bytes = string_bytes.replace(b"\n", b"\r\n")
-                if remove_bytes in data:                    
-                    data = data.replace(remove_bytes, b"")                    
+                if remove_bytes in data:
+                    data = data.replace(remove_bytes, b"")
                     self._hide_echo.discard(string_bytes)
                     if not data:
-                        data = b"\r"                    
+                        data = b"\r"
 
             if line := unicode_decoder.decode(data, final=not data):
                 if self.terminal is None or self.terminal.is_finalized:
@@ -200,8 +200,12 @@ class Shell:
                     # if previous_state is not None:
                     #     self.terminal.set_state(previous_state)
                     self.terminal.set_write_to_stdin(self.write)
-                if await self.terminal.write(line):
-                    self.terminal.display = True
+                if await self.terminal.write(line) and not self.terminal.display:
+                    if (
+                        self.terminal.alternate_screen
+                        or not self.terminal.state.scrollback_buffer.is_blank
+                    ):
+                        self.terminal.display = True
                 new_directory = self.terminal.current_directory
                 if new_directory and new_directory != current_directory:
                     current_directory = new_directory
