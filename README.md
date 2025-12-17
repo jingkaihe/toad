@@ -25,7 +25,7 @@ Run coding agents seamlessly under a single beautiful terminal UI, thanks to the
 
 ## Compatibility
 
-Toad runs on Linux and macOS. Native Windows support is lacking, but Toad till run quite well with WSL.
+Toad runs on Linux and macOS. Native Windows support is lacking, but Toad will run quite well with WSL.
 
 Toad is a terminal application.
 Any terminal will work, although if you are using the default terminal on macOS you will get a much reduced experience.
@@ -37,13 +37,13 @@ I recommend [Ghostty](https://ghostty.org/) which is fully featured and has amaz
 The easiest way to install Toad is by pasting the following in to your terminal:
 
 ```bash
-curl -fsSL batrachian.ai/install | bash
+curl -fsSL batrachian.ai/install | sh
 ```
 
 Python developers may prefer to install with the following (assumes you have [uv](https://docs.astral.sh/uv/) installed):
 
 ```bash
-uvx install -U batrachian-toad
+uv tool install -U batrachian-toad
 ```
 
 ## Using Toad
@@ -105,6 +105,7 @@ toad serve
 Toad was built by [Will McGugan](https://github.com/willmcgugan) and is currently under active development.
 
 To duscuss Toad, join the #toad channel on the [Textualize discord server](https://discord.gg/Enf6Z3qhVr).
+
 
 
 
