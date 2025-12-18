@@ -161,7 +161,7 @@ def acp(
         "identity": identity,
         "name": title or command.partition(" ")[0],
         "short_name": "agent",
-        "url": "https://github.com/textualize/toad",
+        "url": "https://github.com/batrachianai/toad",
         "protocol": "acp",
         "type": "coding",
         "author_name": "Will McGugan",
@@ -198,7 +198,7 @@ def acp(
     print("")
     print("[bold magenta]Thanks for trying out Toad!")
     print("Please head to Discussions to share your experiences (good or bad).")
-    print("https://github.com/Textualize/toad/discussions")
+    print("https://github.com/batrachianai/toad/discussions")
 
 
 @main.command("settings")

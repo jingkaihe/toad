@@ -289,8 +289,8 @@ class StoreScreen(Screen):
             "\n\n",
             (
                 Content.from_markup(
-                    "[dim]Code: [@click=screen.url('https://github.com/Textualize/toad')]Repository[/] "
-                    "Bugs: [@click=screen.url('https://github.com/Textualize/toad/discussions')]Discussions[/]"
+                    "[dim]Code: [@click=screen.url('https://github.com/batrachianai/toad')]Repository[/] "
+                    "Bugs: [@click=screen.url('https://github.com/batrachianai/toad/discussions')]Discussions[/]"
                 )
             ),
         )
