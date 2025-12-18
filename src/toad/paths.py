@@ -16,7 +16,7 @@ def path_to_name(path: Path) -> str:
     Returns:
         A stringified version of the path.
     """
-    name = str(path.resolve()).replace("/", "-")
+    name = str(path.resolve()).lstrip("/").replace("/", "-")
     return name
 
 

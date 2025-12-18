@@ -210,6 +210,8 @@ def get_store_screen() -> StoreScreen:
 
 
 class ToadApp(App, inherit_bindings=False):
+    """The top level app."""
+
     SCREENS = {"settings": get_settings_screen}
     MODES = {"store": get_store_screen}
     BINDING_GROUP_TITLE = "System"
