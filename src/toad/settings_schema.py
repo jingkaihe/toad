@@ -1,6 +1,5 @@
 from toad.settings import SchemaDict
 
-
 SCHEMA: list[SchemaDict] = [
     {
         "key": "ui",
@@ -23,9 +22,13 @@ SCHEMA: list[SchemaDict] = [
                     "monokai",
                     "nord",
                     "solarized-light",
+                    "solarized-dark",
                     "textual-dark",
                     "textual-light",
                     "tokyo-night",
+                    "rose-pine",
+                    "rose-pine-moon",
+                    "rose-pine-dawn",
                 ],
             },
             {
