@@ -57,3 +57,6 @@ class AgentBase(ABC):
 
     def get_info(self) -> Content:
         return Content("")
+
+    async def stop(self) -> None:
+        """Stop the agent (gracefully exit the process)"""

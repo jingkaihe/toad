@@ -471,6 +471,13 @@ class Agent(AgentBase):
         if agent_output is not None:
             agent_output.close()
 
+        self._process = None
+
+    async def stop(self) -> None:
+        """Gracefully stop the process."""
+        if self._process is not None:
+            self._process.terminate()
+
     async def run(self) -> None:
         """The main logic of the Agent."""
         if constants.ACP_INITIALIZE:
