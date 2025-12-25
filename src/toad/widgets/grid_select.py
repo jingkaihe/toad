@@ -67,7 +67,11 @@ class GridSelect(containers.ItemGrid, can_focus=True):
     def highlight_last(self) -> None:
         if (grid_size := self.grid_size) is not None:
             width, height = grid_size
-            self.highlighted = (height - 1) * width
+
+            if width == 1:
+                self.highlighted = len(self.children) - 1
+            else:
+                self.highlighted = (height - 1) * width
 
     def on_focus(self):
         if self.highlighted is None:

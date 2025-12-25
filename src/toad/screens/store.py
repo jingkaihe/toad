@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from itertools import zip_longest
 import os
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
 from textual.binding import Binding
 from textual.screen import Screen
@@ -335,19 +335,27 @@ class StoreScreen(Screen):
                 for agent in chat_bots:
                     yield AgentItem(agent)
 
+    def move_focus(self, direction: Literal[-1] | Literal[+1]) -> None:
+        if isinstance(self.focused, GridSelect):
+            focus_chain = list(self.query(GridSelect))
+            if self.focused in focus_chain:
+                index = focus_chain.index(self.focused)
+                new_focus = focus_chain[(index + direction) % len(focus_chain)]
+                if direction == -1:
+                    new_focus.highlight_last()
+                else:
+                    new_focus.highlight_first()
+                new_focus.focus(scroll_visible=False)
+
     @on(GridSelect.LeaveUp)
     def on_grid_select_leave_up(self, event: GridSelect.LeaveUp):
         event.stop()
-        widget_up = self.screen._move_focus(-1)
-        if isinstance(widget_up, GridSelect):
-            widget_up.highlight_last()
+        self.move_focus(-1)
 
     @on(GridSelect.LeaveDown)
     def on_grid_select_leave_down(self, event: GridSelect.LeaveUp):
         event.stop()
-        widget_up = self.screen._move_focus(+1)
-        if isinstance(widget_up, GridSelect):
-            widget_up.highlight_first()
+        self.move_focus(+1)
 
     @on(GridSelect.Selected, ".agents-picker")
     @work
