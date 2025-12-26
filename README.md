@@ -25,7 +25,7 @@ Run coding agents seamlessly under a single beautiful terminal UI, thanks to the
 
 ## Compatibility
 
-Toad runs on Linux and macOS. Native Windows support is lacking, but Toad will run quite well with WSL.
+Toad runs on Linux and macOS. Native Windows support is currently lacking (but on the roadmap), but Toad will run quite well with WSL.
 
 Toad is a terminal application.
 Any terminal will work, although if you are using the default terminal on macOS you will get a much reduced experience.
@@ -124,6 +124,7 @@ Some planned features:
 - Expose model selection (waiting on ACP update)
 - Sessions
 - Multiple agents
+- Windows native support
 
 ### Reporting bugs
 
@@ -131,6 +132,7 @@ This project is trialling a non-traditional approach to issues.
 Before an issue is created, there must be a post in Dicussions, approved by a Toad dev (Currently @willmcgugan).
 
 By allowing the discussions to happen in the Discussion tabs, issues can be reserved for actionable tasks with a clear description and goal.
+
 
 
 
