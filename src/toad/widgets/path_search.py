@@ -111,7 +111,7 @@ class PathSearch(containers.VerticalGroup):
             self.option_list.set_options(
                 [
                     Option(highlighted_path, highlighted_path.plain)
-                    for highlighted_path in self.highlighted_paths
+                    for highlighted_path in self.highlighted_paths[:100]
                 ],
             )
             return
