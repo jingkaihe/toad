@@ -219,8 +219,14 @@ class PathSearch(containers.VerticalGroup):
     def action_dismiss(self) -> None:
         self.post_message(Dismiss(self))
 
+    def on_show(self) -> None:
+        self.focus()
+
     def focus(self, scroll_visible: bool = False) -> Self:
-        return self.input.focus(scroll_visible=scroll_visible)
+        if self.show_tree_picker:
+            return self.tree_view.focus(scroll_visible=scroll_visible)
+        else:
+            return self.input.focus(scroll_visible=scroll_visible)
 
     def on_descendant_blur(self, event: events.DescendantBlur) -> None:
         if self.show_tree_picker:
