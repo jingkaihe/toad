@@ -150,6 +150,10 @@ class Contents(containers.VerticalGroup, can_focus=False):
             )
         return placements
 
+    def _refresh_styles(self) -> None:
+        """Prevent expensive update of styles"""
+        # TODO: Add an option in Textual to do this without overriding a private method
+
 
 class ContentsGrid(containers.Grid):
     def pre_layout(self, layout) -> None:
@@ -279,6 +283,7 @@ class Conversation(containers.Vertical):
 
         self.session_start_time: float | None = None
         self._terminal_count = 0
+        self._require_check_prune = False
 
     @property
     def agent_title(self) -> str | None:
@@ -1089,7 +1094,6 @@ class Conversation(containers.Vertical):
 
         else:
             self.agent_ready = True
-        self.ask([Answer("foo", "foo")], "Hello")
 
     def _settings_changed(self, setting_item: tuple[str, str]) -> None:
         key, value = setting_item
@@ -1113,9 +1117,10 @@ class Conversation(containers.Vertical):
                 await self.shell.wait_for_ready()
         if ready and (agent_data := self._agent_data) is not None:
             welcome = agent_data.get("welcome", None)
-            from toad.widgets.markdown_note import MarkdownNote
+            if welcome is not None:
+                from toad.widgets.markdown_note import MarkdownNote
 
-            await self.post(MarkdownNote(welcome))
+                await self.post(MarkdownNote(welcome))
 
     def on_mouse_down(self, event: events.MouseDown) -> None:
         self._mouse_down_offset = event.screen_offset
@@ -1170,11 +1175,55 @@ class Conversation(containers.Vertical):
             await self._loading.remove()
         if not self.contents.is_attached:
             return widget
+
         await self.contents.mount(widget)
         widget.loading = loading
         if anchor:
             self.window.anchor()
+        self._require_check_prune = True
+        self.call_after_refresh(self.check_prune)
         return widget
+
+    async def check_prune(self) -> None:
+        """Check if a prune is required."""
+        if self._require_check_prune:
+            await self.prune_window(1500, 2500)
+            self._require_check_prune = False
+
+    async def prune_window(self, low_mark: int, high_mark: int) -> None:
+        """Remove older children to keep within a certain range.
+
+        Args:
+            low_mark: Height to aim for.
+            high_mark: Height to start pruning.
+        """
+
+        assert high_mark >= low_mark
+
+        contents = self.contents
+        height = contents.virtual_size.height
+        if height <= high_mark:
+            return
+        prune_children: list[Widget] = []
+        bottom_margin = 0
+        prune_height = 0
+        for child in contents.children:
+            if not child.display:
+                continue
+            top, _, bottom, _ = child.styles.margin
+            child_height = child.outer_size.height
+            prune_height = (
+                (prune_height - bottom_margin + max(bottom_margin, top))
+                + bottom
+                + child_height
+            )
+            bottom_margin = bottom
+            if height - prune_height <= low_mark:
+                break
+            prune_children.append(child)
+
+        if prune_children:
+            await contents.remove_children(prune_children)
 
     async def new_terminal(self) -> Terminal:
         """Create a new interactive Terminal.

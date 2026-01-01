@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.15] - 2025-01-01
+
+### Added
+
+- Added pruning of very long conversations. This may be exposed in settings in the future.
+
+### Fixed
+
+- Fixed broken prompt with in question mode and the app blurs
+- Fixed performance issue caused by timer
+
 ## [0.5.14] - 2025-12-31
 
 ### Added
@@ -91,6 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release. This document will be updated for subsequent releases.
 
+[0.5.15: https://github.com/Textualize/textual/compare/v0.5.14...v0.5.15
+[0.5.14: https://github.com/Textualize/textual/compare/v0.5.13...v0.5.14
 [0.5.13: https://github.com/Textualize/textual/compare/v0.5.12...v0.5.13
 [0.5.12]: https://github.com/Textualize/textual/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/Textualize/textual/compare/v0.5.10...v0.5.11
