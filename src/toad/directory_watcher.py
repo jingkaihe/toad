@@ -30,7 +30,6 @@ class DirectoryWatcher(threading.Thread, FileSystemEventHandler):
         super().__init__(name=repr(self))
 
     def on_any_event(self, event: FileSystemEvent) -> None:
-        print(event)
         if not isinstance(event, (DirModifiedEvent, FileModifiedEvent)):
             # We aren't interested in modifications. Only when files are potentially added / removed
             self._widget.post_message(DirectoryChanged())
